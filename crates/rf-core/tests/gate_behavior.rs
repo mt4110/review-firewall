@@ -113,6 +113,22 @@ fn scoped_changed_path_without_failure_mode_is_not_present_pr_impact() {
 }
 
 #[test]
+fn config_can_disable_failure_mode_requirement_when_impact_is_evidenced() {
+    let scan =
+        base_scan("This PR has a security concern because the response includes the auth token.");
+    let config = GateConfigSnapshot {
+        require_failure_mode: false,
+        ..GateConfigSnapshot::default()
+    };
+
+    let gate = gate_scan(&scan, &config, &[]);
+
+    let blocker = gate.residual_blockers.first().expect("residual blocker");
+    assert_eq!(blocker.concern, BlockerConcern::Security);
+    assert_eq!(blocker.failure_mode, "failure mode was not extracted");
+}
+
+#[test]
 fn config_can_disable_evidence_requirement() {
     let scan = base_scan(
         "This can break the response contract in this PR and should be fixed before merge.",
@@ -129,7 +145,7 @@ fn config_can_disable_evidence_requirement() {
 }
 
 #[test]
-fn config_rejects_comment_without_required_alternative_or_impact() {
+fn config_rejects_comment_without_required_alternative() {
     let scan = base_scan(
         "This can break the response contract in this PR because `partial` changes client handling.",
     );
@@ -144,7 +160,22 @@ fn config_rejects_comment_without_required_alternative_or_impact() {
 }
 
 #[test]
-fn config_accepts_comment_with_required_alternative_or_impact() {
+fn config_accepts_comment_with_required_alternative() {
+    let scan = base_scan(
+        "This can break the response contract in this PR because `partial` changes client handling. Instead, keep the current response shape until the schema migration is ready.",
+    );
+    let config = GateConfigSnapshot {
+        require_alternative: true,
+        ..GateConfigSnapshot::default()
+    };
+
+    let gate = gate_scan(&scan, &config, &[]);
+
+    assert_eq!(gate.residual_blockers.len(), 1);
+}
+
+#[test]
+fn config_rejects_generic_fix_word_when_alternative_is_required() {
     let scan = base_scan(
         "This can break the response contract in this PR because `partial` changes client handling. This should be fixed before merge.",
     );
@@ -155,7 +186,7 @@ fn config_accepts_comment_with_required_alternative_or_impact() {
 
     let gate = gate_scan(&scan, &config, &[]);
 
-    assert_eq!(gate.residual_blockers.len(), 1);
+    assert!(gate.residual_blockers.is_empty());
 }
 
 #[test]

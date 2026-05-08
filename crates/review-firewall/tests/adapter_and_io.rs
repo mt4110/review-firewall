@@ -126,6 +126,19 @@ fn codeowners_detection_prefers_github_directory() {
 }
 
 #[test]
+fn codeowners_detection_preserves_empty_owner_overrides() {
+    let repo = temp_dir("codeowners-empty-owner");
+    fs::write(repo.join("CODEOWNERS"), "/apps/ @platform\n/apps/github\n").expect("write root");
+
+    let loaded = io::codeowners::load(&repo);
+
+    assert!(loaded.found);
+    assert_eq!(loaded.rules.len(), 2);
+    assert_eq!(loaded.rules[1].pattern, "/apps/github");
+    assert!(loaded.rules[1].owners.is_empty());
+}
+
+#[test]
 fn git_remote_parser_normalizes_github_origin() {
     let parsed =
         adapter::git::parse_github_remote_for_tests("git@github.com:example/review-firewall.git")

@@ -54,7 +54,7 @@ fn parse_rule(line: &str) -> Option<CodeownerRule> {
         return None;
     }
     let tokens = trimmed.split_whitespace().collect::<Vec<_>>();
-    if tokens.len() < 2 {
+    if tokens.is_empty() {
         return None;
     }
     Some(CodeownerRule {

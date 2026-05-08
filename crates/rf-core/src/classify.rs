@@ -97,7 +97,13 @@ fn classify_comment(
     let concern = extract_concern(&comment.body);
     let failure_mode = extract_failure_mode(&comment.body);
     let evidence = extract_evidence(comment, scan);
-    let present_pr_impact = extract_present_pr_impact(comment, failure_mode.as_deref());
+    let present_pr_impact = extract_present_pr_impact(
+        comment,
+        failure_mode.as_deref(),
+        config.require_failure_mode,
+        concern,
+        !evidence.is_empty(),
+    );
     let preference_only = is_preference_only(&comment.body, concern);
     let author_comment = is_pr_author_comment(comment, scan);
     let ownership = build_ownership_advisory(
@@ -114,26 +120,20 @@ fn classify_comment(
         && (!config.require_evidence || !evidence.is_empty())
         && !preference_only;
 
-    let alternative_or_impact = contains_any(
+    let alternative_present = contains_any(
         &normalize_body(&comment.body),
         &[
             "alternative",
             "instead",
-            "should",
-            "otherwise",
-            "risk",
-            "impact",
-            "fix",
-            "対応",
-            "修正",
             "代替",
-            "影響",
-            "リスク",
+            "別案",
+            "別の方法",
+            "他の方法",
         ],
     );
     let full_blocker = candidate_blocker
         && present_pr_impact
-        && (!config.require_alternative || alternative_or_impact);
+        && (!config.require_alternative || alternative_present);
 
     let comment_type = if full_blocker {
         CommentType::Blocker
@@ -620,7 +620,13 @@ fn extract_evidence(comment: &CommentRecord, scan: &ScanArtifact) -> Vec<String>
     dedupe_strings(evidence)
 }
 
-fn extract_present_pr_impact(comment: &CommentRecord, failure_mode: Option<&str>) -> bool {
+fn extract_present_pr_impact(
+    comment: &CommentRecord,
+    failure_mode: Option<&str>,
+    require_failure_mode: bool,
+    concern: Option<BlockerConcern>,
+    evidence_present: bool,
+) -> bool {
     let lower = normalize_body(&comment.body);
     let scope_marker = contains_any(
         &lower,
@@ -639,7 +645,10 @@ fn extract_present_pr_impact(comment: &CommentRecord, failure_mode: Option<&str>
             "here",
         ],
     );
-    scope_marker && failure_mode.is_some()
+    if !scope_marker {
+        return false;
+    }
+    failure_mode.is_some() || (!require_failure_mode && concern.is_some() && evidence_present)
 }
 
 fn is_preference_only(body: &str, concern: Option<BlockerConcern>) -> bool {

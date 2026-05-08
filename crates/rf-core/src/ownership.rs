@@ -79,23 +79,31 @@ fn codeowner_pattern_matches(pattern: &str, candidate_path: &str) -> bool {
     let normalized_pattern = normalize_path(pattern);
     let anchored = normalized_pattern.starts_with('/');
     let stripped = normalized_pattern.trim_start_matches('/');
-    let pattern = if stripped.ends_with('/') {
-        format!("{stripped}**")
+    let patterns = if stripped.ends_with('/') {
+        vec![format!("{stripped}**")]
     } else {
-        stripped.to_owned()
+        vec![stripped.to_owned(), format!("{stripped}/**")]
     };
 
     if anchored {
-        glob_matches(&pattern, candidate_path)
+        patterns
+            .iter()
+            .any(|pattern| glob_matches(pattern, candidate_path))
     } else {
-        if glob_matches(&pattern, candidate_path) {
+        if patterns
+            .iter()
+            .any(|pattern| glob_matches(pattern, candidate_path))
+        {
             return true;
         }
 
         let segments = candidate_path.split('/').collect::<Vec<_>>();
         for index in 1..segments.len() {
             let suffix = segments[index..].join("/");
-            if glob_matches(&pattern, &suffix) {
+            if patterns
+                .iter()
+                .any(|pattern| glob_matches(pattern, &suffix))
+            {
                 return true;
             }
         }
@@ -187,6 +195,45 @@ mod tests {
             }],
             true,
         );
+        assert!(advisory.owner_match);
+    }
+
+    #[test]
+    fn empty_owner_override_clears_broader_match() {
+        let advisory = build_ownership_advisory(
+            "alice",
+            Some("apps/github/main.rs"),
+            &[String::from("apps/github/main.rs")],
+            &[
+                CodeownerRule {
+                    pattern: "/apps/".into(),
+                    owners: vec!["@alice".into()],
+                },
+                CodeownerRule {
+                    pattern: "/apps/github".into(),
+                    owners: Vec::new(),
+                },
+            ],
+            true,
+        );
+
+        assert!(!advisory.owner_match);
+        assert_eq!(format!("{:?}", advisory.ownership_scope), "None");
+    }
+
+    #[test]
+    fn directory_style_patterns_match_descendant_files() {
+        let advisory = build_ownership_advisory(
+            "alice",
+            Some("services/api/logs/output.txt"),
+            &[String::from("services/api/logs/output.txt")],
+            &[CodeownerRule {
+                pattern: "**/logs".into(),
+                owners: vec!["@alice".into()],
+            }],
+            true,
+        );
+
         assert!(advisory.owner_match);
     }
 }
