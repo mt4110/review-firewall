@@ -137,16 +137,34 @@ fn git_remote_parser_normalizes_github_origin() {
 #[test]
 fn git_status_parser_normalizes_windows_rename_paths() {
     let parsed = adapter::git::parse_status_paths_for_tests(
-        "R  src\\old.rs -> src\\new.rs\n?? crates\\rf-core\\src\\lib.rs\n",
+        "R  src\\new.rs\0src\\old.rs\0?? crates\\rf-core\\src\\lib.rs\0",
     );
     assert_eq!(parsed, vec!["src/new.rs", "crates/rf-core/src/lib.rs"]);
 }
 
 #[test]
 fn git_status_parser_keeps_modified_file_prefixes_intact() {
-    let parsed = adapter::git::parse_status_paths_for_tests(" M README.md\n");
+    let parsed = adapter::git::parse_status_paths_for_tests(" M README.md\0");
 
     assert_eq!(parsed, vec!["README.md"]);
+}
+
+#[test]
+fn git_status_parser_keeps_spaces_from_porcelain_z() {
+    let parsed = adapter::git::parse_status_paths_for_tests("?? docs/has space.md\0");
+
+    assert_eq!(parsed, vec!["docs/has space.md"]);
+}
+
+#[test]
+fn git_remote_parser_uses_any_configured_github_remote() {
+    let parsed = adapter::git::parse_repository_identity_from_remotes_for_tests(
+        "upstream\tgit@github.com:example/review-firewall.git (fetch)\nupstream\tgit@github.com:example/review-firewall.git (push)\n",
+    )
+    .expect("parsed remote");
+
+    assert_eq!(parsed.host, "github.com");
+    assert_eq!(parsed.full_name, "example/review-firewall");
 }
 
 #[test]

@@ -159,7 +159,7 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     &mut warnings,
                     repository.reason.clone().or_else(|| {
                         Some(String::from(
-                            "Could not parse GitHub repository identity from origin remote",
+                            "Could not parse GitHub repository identity from git remotes",
                         ))
                     }),
                     Status::Partial,

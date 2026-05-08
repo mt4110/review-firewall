@@ -88,11 +88,7 @@ pub fn repository_identity(repo_root: &Path) -> RepositoryProbe {
     let output = run_process(
         repo_root,
         "git",
-        &[
-            String::from("remote"),
-            String::from("get-url"),
-            String::from("origin"),
-        ],
+        &[String::from("remote"), String::from("-v")],
     );
     if !output.success {
         return RepositoryProbe {
@@ -105,11 +101,19 @@ pub fn repository_identity(repo_root: &Path) -> RepositoryProbe {
         };
     }
 
-    let remote = output.stdout.trim();
-    let parsed = parse_github_remote(remote);
+    let parsed = parse_repository_identity_from_remotes(&output.stdout);
+    let reason = if parsed.is_some() {
+        None
+    } else if output.stdout.trim().is_empty() {
+        Some(String::from("No git remotes configured"))
+    } else {
+        Some(String::from(
+            "Could not parse GitHub repository identity from git remotes",
+        ))
+    };
     RepositoryProbe {
         identity: parsed,
-        reason: None,
+        reason,
     }
 }
 
@@ -133,7 +137,12 @@ pub fn changed_files(repo_root: &Path, base_branch: Option<&str>) -> PathsProbe 
         String::from("HEAD~1"),
         String::from("HEAD"),
     ]);
-    attempts.push(vec![String::from("status"), String::from("--short")]);
+    attempts.push(vec![
+        String::from("status"),
+        String::from("--porcelain=v1"),
+        String::from("-z"),
+        String::from("--untracked-files=all"),
+    ]);
 
     for attempt in attempts {
         let output = run_process(repo_root, "git", &attempt);
@@ -179,10 +188,27 @@ fn parse_github_remote(remote: &str) -> Option<RepositoryIdentity> {
     })
 }
 
+fn parse_repository_identity_from_remotes(output: &str) -> Option<RepositoryIdentity> {
+    output.lines().find_map(|line| {
+        let mut parts = line.split_whitespace();
+        let _name = parts.next()?;
+        let url = parts.next()?;
+        parse_github_remote(url)
+    })
+}
+
 #[cfg(test)]
 #[allow(dead_code)]
 pub fn parse_github_remote_for_tests(remote: &str) -> Option<RepositoryIdentity> {
     parse_github_remote(remote)
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn parse_repository_identity_from_remotes_for_tests(
+    output: &str,
+) -> Option<RepositoryIdentity> {
+    parse_repository_identity_from_remotes(output)
 }
 
 fn parse_remote_host_and_path(remote: &str) -> Option<(&str, &str)> {
@@ -222,21 +248,24 @@ fn parse_changed_paths(output: &str) -> Vec<String> {
 
 fn parse_status_paths(output: &str) -> Vec<String> {
     let mut paths = Vec::new();
-    for line in output.lines() {
-        let line = line.trim_end();
-        if line.len() < 4 {
-            continue;
-        }
-        let candidate = line[3..].trim();
+    let records = output
+        .split('\0')
+        .filter(|record| !record.is_empty())
+        .collect::<Vec<_>>();
+    let mut index = 0;
+    while let Some(record) = records.get(index) {
+        let status = record.get(..2).unwrap_or_default();
+        let candidate = record.get(3..).unwrap_or_default();
         if candidate.is_empty() {
+            index += 1;
             continue;
         }
-        let path = candidate
-            .split(" -> ")
-            .last()
-            .map(normalize_path)
-            .unwrap_or_else(|| normalize_path(candidate));
-        paths.push(path);
+        paths.push(normalize_path(candidate));
+        index += if status.contains('R') || status.contains('C') {
+            2
+        } else {
+            1
+        };
     }
     unique_paths(paths)
 }
