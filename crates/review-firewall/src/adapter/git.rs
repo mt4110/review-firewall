@@ -173,9 +173,6 @@ pub fn changed_files(repo_root: &Path, base_branch: Option<&str>) -> PathsProbe 
 fn parse_github_remote(remote: &str) -> Option<RepositoryIdentity> {
     let remote = remote.trim();
     let (host, suffix) = parse_remote_host_and_path(remote)?;
-    if !is_github_compatible_host(host) {
-        return None;
-    }
     let suffix = suffix.trim_start_matches([':', '/']);
     let suffix = suffix.strip_suffix(".git").unwrap_or(suffix);
     let mut parts = suffix
@@ -193,7 +190,7 @@ fn parse_github_remote(remote: &str) -> Option<RepositoryIdentity> {
     })
 }
 
-fn is_github_compatible_host(host: &str) -> bool {
+fn is_preferred_github_host(host: &str) -> bool {
     let host = host.to_ascii_lowercase();
     host == "github.com"
         || host.starts_with("github.")
@@ -207,27 +204,45 @@ fn parse_repository_identity_from_remotes(output: &str) -> Option<RepositoryIden
         .lines()
         .filter_map(parse_remote_listing)
         .collect::<Vec<_>>();
+    find_repository_identity(&remotes, true).or_else(|| find_repository_identity(&remotes, false))
+}
+
+fn find_repository_identity(
+    remotes: &[RemoteListing<'_>],
+    preferred_github_host_only: bool,
+) -> Option<RepositoryIdentity> {
+    find_remote_identity(remotes, preferred_github_host_only, |remote| {
+        remote.name == "origin" && remote.direction == "(fetch)"
+    })
+    .or_else(|| {
+        find_remote_identity(remotes, preferred_github_host_only, |remote| {
+            remote.name == "origin"
+        })
+    })
+    .or_else(|| {
+        find_remote_identity(remotes, preferred_github_host_only, |remote| {
+            remote.direction == "(fetch)"
+        })
+    })
+    .or_else(|| find_remote_identity(remotes, preferred_github_host_only, |_| true))
+}
+
+fn find_remote_identity(
+    remotes: &[RemoteListing<'_>],
+    preferred_github_host_only: bool,
+    predicate: impl Fn(&RemoteListing<'_>) -> bool,
+) -> Option<RepositoryIdentity> {
     remotes
         .iter()
-        .find(|remote| remote.name == "origin" && remote.direction == "(fetch)")
-        .and_then(|remote| parse_github_remote(remote.url))
-        .or_else(|| {
-            remotes
-                .iter()
-                .find(|remote| remote.name == "origin")
-                .and_then(|remote| parse_github_remote(remote.url))
+        .filter(|remote| predicate(remote))
+        .filter_map(|remote| {
+            let identity = parse_github_remote(remote.url)?;
+            if preferred_github_host_only && !is_preferred_github_host(&identity.host) {
+                return None;
+            }
+            Some(identity)
         })
-        .or_else(|| {
-            remotes
-                .iter()
-                .find(|remote| remote.direction == "(fetch)")
-                .and_then(|remote| parse_github_remote(remote.url))
-        })
-        .or_else(|| {
-            remotes
-                .iter()
-                .find_map(|remote| parse_github_remote(remote.url))
-        })
+        .next()
 }
 
 #[derive(Debug, Clone, Copy)]

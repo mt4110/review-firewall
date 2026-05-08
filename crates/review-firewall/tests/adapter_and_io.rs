@@ -306,11 +306,14 @@ fn git_remote_parser_skips_non_github_origin_for_github_remote() {
 }
 
 #[test]
-fn git_remote_parser_rejects_non_github_hosts() {
-    assert!(
-        adapter::git::parse_github_remote_for_tests("git@gitlab.com:example/review-firewall.git")
-            .is_none()
-    );
+fn git_remote_parser_falls_back_to_arbitrary_enterprise_hosts() {
+    let parsed = adapter::git::parse_repository_identity_from_remotes_for_tests(
+        "origin\tgit@enterprise.internal:example/review-firewall.git (fetch)\norigin\tgit@enterprise.internal:example/review-firewall.git (push)\n",
+    )
+    .expect("parsed enterprise remote");
+
+    assert_eq!(parsed.host, "enterprise.internal");
+    assert_eq!(parsed.full_name, "example/review-firewall");
 }
 
 #[test]
@@ -328,6 +331,14 @@ fn git_remote_parser_supports_enterprise_hosts() {
     assert_eq!(ssh.full_name, "example/review-firewall");
     assert_eq!(https.host, "ghe.example.com");
     assert_eq!(https.full_name, "example/review-firewall");
+
+    let arbitrary = adapter::git::parse_github_remote_for_tests(
+        "git@enterprise.internal:example/review-firewall.git",
+    )
+    .expect("parsed arbitrary enterprise remote");
+
+    assert_eq!(arbitrary.host, "enterprise.internal");
+    assert_eq!(arbitrary.full_name, "example/review-firewall");
 }
 
 #[test]
