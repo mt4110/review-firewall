@@ -89,9 +89,24 @@ fn config_can_disable_evidence_requirement() {
 }
 
 #[test]
-fn config_can_require_alternative_or_impact() {
+fn config_rejects_comment_without_required_alternative_or_impact() {
     let scan = base_scan(
         "This can break the response contract in this PR because `partial` changes client handling.",
+    );
+    let config = GateConfigSnapshot {
+        require_alternative: true,
+        ..GateConfigSnapshot::default()
+    };
+
+    let gate = gate_scan(&scan, &config, &[]);
+
+    assert!(gate.residual_blockers.is_empty());
+}
+
+#[test]
+fn config_accepts_comment_with_required_alternative_or_impact() {
+    let scan = base_scan(
+        "This can break the response contract in this PR because `partial` changes client handling. This should be fixed before merge.",
     );
     let config = GateConfigSnapshot {
         require_alternative: true,
@@ -127,4 +142,6 @@ fn residual_blockers_collapse_to_one_per_thread() {
     let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
 
     assert_eq!(gate.residual_blockers.len(), 1);
+    assert_eq!(gate.candidate_blockers.len(), 1);
+    assert_eq!(gate.duplicates_collapsed.len(), 1);
 }

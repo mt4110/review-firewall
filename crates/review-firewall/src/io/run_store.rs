@@ -1,6 +1,7 @@
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use rf_core::domain::LatestPointer;
 use time::OffsetDateTime;
@@ -18,9 +19,7 @@ pub struct RunDirectory {
 pub fn create_new(repo_root: &Path) -> io::Result<RunDirectory> {
     let run_root = repo_root.join(".review-firewall").join("run");
     fs::create_dir_all(&run_root)?;
-    let timestamp = current_timestamp()?;
-    let directory = run_root.join(&timestamp);
-    fs::create_dir_all(&directory)?;
+    let (timestamp, directory) = create_unique_run_directory(&run_root)?;
     let run = RunDirectory {
         timestamp,
         directory,
@@ -28,6 +27,24 @@ pub fn create_new(repo_root: &Path) -> io::Result<RunDirectory> {
     };
     write_latest(&run)?;
     Ok(run)
+}
+
+fn create_unique_run_directory(run_root: &Path) -> io::Result<(String, PathBuf)> {
+    for _ in 0..5 {
+        let timestamp = current_timestamp()?;
+        let directory = run_root.join(&timestamp);
+        match fs::create_dir(&directory) {
+            Ok(()) => return Ok((timestamp, directory)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+                std::thread::sleep(Duration::from_secs(1));
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    Err(io::Error::new(
+        io::ErrorKind::AlreadyExists,
+        "could not allocate a unique run timestamp",
+    ))
 }
 
 pub fn latest_or_create(repo_root: &Path) -> io::Result<RunDirectory> {
@@ -91,5 +108,23 @@ mod tests {
 
         assert_eq!(run.timestamp, loaded.timestamp);
         assert!(run.latest.exists());
+    }
+
+    #[test]
+    fn consecutive_runs_do_not_reuse_directory() {
+        let root = env::temp_dir().join(format!(
+            "review-firewall-run-store-unique-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("unix time")
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).expect("temp dir");
+
+        let first = create_new(&root).expect("first run");
+        let second = create_new(&root).expect("second run");
+
+        assert_ne!(first.timestamp, second.timestamp);
+        assert_ne!(first.directory, second.directory);
     }
 }

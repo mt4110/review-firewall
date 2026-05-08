@@ -23,7 +23,9 @@ pub fn gate_scan(
     let duplicates_collapsed = collapse_duplicates(&mut classified);
     let candidate_blockers = classified
         .iter()
-        .filter(|comment| is_candidate_blocker(comment, config))
+        .filter(|comment| {
+            comment.duplicate_of_comment_id.is_none() && is_candidate_blocker(comment, config)
+        })
         .map(to_residual_blocker)
         .collect::<Vec<_>>();
 
@@ -104,11 +106,23 @@ fn classify_comment(
         && (!config.require_evidence || !evidence.is_empty())
         && !preference_only;
 
-    let alternative_or_impact = failure_mode.is_some()
-        || contains_any(
-            &comment.body,
-            &["instead", "should", "otherwise", "risk", "impact"],
-        );
+    let alternative_or_impact = contains_any(
+        &normalize_body(&comment.body),
+        &[
+            "alternative",
+            "instead",
+            "should",
+            "otherwise",
+            "risk",
+            "impact",
+            "fix",
+            "対応",
+            "修正",
+            "代替",
+            "影響",
+            "リスク",
+        ],
+    );
     let full_blocker = candidate_blocker
         && present_pr_impact
         && (!config.require_alternative || alternative_or_impact);

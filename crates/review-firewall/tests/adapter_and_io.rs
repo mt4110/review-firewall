@@ -122,3 +122,17 @@ fn scan_normalization_from_gh_fixture_preserves_expected_shape() {
     assert_eq!(comments.len(), 2);
     assert_eq!(comments[0].path.as_deref(), Some("src/api/response.rs"));
 }
+
+#[test]
+fn scan_normalization_drops_empty_review_decisions() {
+    let pr_value = serde_json::json!({
+        "number": 143,
+        "title": "Draft bootstrap",
+        "reviewDecision": "",
+        "reviews": [{ "state": "" }]
+    });
+
+    let pr = command::scan::build_pull_request_summary_for_tests(&pr_value);
+
+    assert!(pr.review_decisions.is_empty());
+}
