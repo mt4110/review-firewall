@@ -24,7 +24,7 @@ Allowed inputs for v0.1:
 - PR metadata via `gh`
 - GitHub review comments
 - GitHub issue comments when available
-- `.github/CODEOWNERS`
+- CODEOWNERS files in `.github/`, repository root, or `docs/`
 - `review-firewall.toml`
 
 Future integrations may import review output from other tools if they preserve this boundary.

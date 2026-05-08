@@ -79,6 +79,51 @@ fn codeowners_detection_reads_rules() {
 }
 
 #[test]
+fn codeowners_detection_uses_root_then_docs_fallbacks() {
+    let root_repo = temp_dir("codeowners-root");
+    fs::write(root_repo.join("CODEOWNERS"), "/src/* @root-owner\n").expect("write root");
+
+    let docs_repo = temp_dir("codeowners-docs");
+    fs::create_dir_all(docs_repo.join("docs")).expect("docs dir");
+    fs::write(
+        docs_repo.join("docs").join("CODEOWNERS"),
+        "/docs/* @docs-owner\n",
+    )
+    .expect("write docs");
+
+    let root_loaded = io::codeowners::load(&root_repo);
+    let docs_loaded = io::codeowners::load(&docs_repo);
+
+    assert!(root_loaded.found);
+    assert_eq!(
+        root_loaded.rules[0].owners,
+        vec![String::from("@root-owner")]
+    );
+    assert!(docs_loaded.found);
+    assert_eq!(
+        docs_loaded.rules[0].owners,
+        vec![String::from("@docs-owner")]
+    );
+}
+
+#[test]
+fn codeowners_detection_prefers_github_directory() {
+    let repo = temp_dir("codeowners-priority");
+    fs::create_dir_all(repo.join(".github")).expect("github dir");
+    fs::write(repo.join("CODEOWNERS"), "/src/* @root-owner\n").expect("write root");
+    fs::write(
+        repo.join(".github").join("CODEOWNERS"),
+        "/src/* @github-owner\n",
+    )
+    .expect("write github");
+
+    let loaded = io::codeowners::load(&repo);
+
+    assert!(loaded.found);
+    assert_eq!(loaded.rules[0].owners, vec![String::from("@github-owner")]);
+}
+
+#[test]
 fn git_remote_parser_normalizes_github_origin() {
     let parsed =
         adapter::git::parse_github_remote_for_tests("git@github.com:example/review-firewall.git")

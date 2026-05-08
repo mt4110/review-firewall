@@ -5,6 +5,7 @@ use rf_core::domain::{DraftReplyArtifact, GateArtifact, ReplyType, Status};
 
 use crate::adapter::git;
 use crate::command::CommandOutcome;
+use crate::io::config::ReviewFirewallConfig;
 use crate::io::{artifacts, config, run_store};
 
 pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
@@ -15,9 +16,11 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
         artifacts::read_json::<GateArtifact>(run.directory.join("gate.json")).map_err(io_error)?;
 
     let draft = if let Some(gate) = gate {
-        build_draft_reply(&gate, policy.reply.max_lines)
+        let mut draft = build_draft_reply(&gate, policy.reply.max_lines);
+        merge_config_status(&mut draft.status, &mut draft.reason, &policy);
+        draft
     } else {
-        DraftReplyArtifact {
+        let mut draft = DraftReplyArtifact {
             status: Status::Error,
             reason: Some(String::from(
                 "gate.json not found; run review-firewall gate first",
@@ -27,7 +30,9 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
             body: String::from(
                 "Thanks. I do not think this blocks merge for this PR.\nReason: the current gate output is missing.\nIf needed, I can track it separately.",
             ),
-        }
+        };
+        merge_config_status(&mut draft.status, &mut draft.reason, &policy);
+        draft
     };
 
     artifacts::write_json(run.directory.join("draft_reply.json"), &draft).map_err(io_error)?;
@@ -48,6 +53,23 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
         ],
         next: None,
     })
+}
+
+fn merge_config_status(
+    status: &mut Status,
+    reason: &mut Option<String>,
+    policy: &ReviewFirewallConfig,
+) {
+    if policy.status == Status::Ok {
+        return;
+    }
+    *status = status.merge(policy.status);
+    if reason.is_none() {
+        *reason = policy
+            .reason
+            .clone()
+            .or_else(|| Some(String::from("Config loaded with partial status")));
+    }
 }
 
 fn reply_label(reply_type: &ReplyType) -> &'static str {

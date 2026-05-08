@@ -251,6 +251,42 @@ fn smoke_flow_creates_all_artifacts() {
 }
 
 #[test]
+fn config_partial_status_reaches_reply_and_escalation_commands() {
+    let repo = temp_dir("smoke-config-partial");
+    init_repo(&repo);
+    let gh_stub = install_gh_success_stub(&repo);
+
+    for args in [vec!["scan", "--pr", "42"], vec!["gate"]] {
+        let output = run_with_path(&repo, &gh_stub, &args);
+        assert!(
+            output.status.success(),
+            "command failed: {:?}\nstdout={}\nstderr={}",
+            args,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    fs::write(
+        repo.join("review-firewall.toml"),
+        "[review]\nmax_pr_thread_roundtrips = nope\n[reply]\nmax_lines = nope\n",
+    )
+    .expect("write invalid config");
+
+    let draft = run_with_path(&repo, &gh_stub, &["draft-reply"]);
+    let escalate = run_with_path(&repo, &gh_stub, &["escalate"]);
+
+    assert!(draft.status.success());
+    assert!(escalate.status.success());
+    let draft_stdout = String::from_utf8_lossy(&draft.stdout);
+    let escalate_stdout = String::from_utf8_lossy(&escalate.stdout);
+    assert!(draft_stdout.contains("STATUS: PARTIAL"));
+    assert!(draft_stdout.contains("REASON: Invalid config value"));
+    assert!(escalate_stdout.contains("STATUS: PARTIAL"));
+    assert!(escalate_stdout.contains("REASON: Invalid config value"));
+}
+
+#[test]
 fn stopless_error_path_still_writes_artifacts() {
     let repo = temp_dir("smoke-error");
     init_repo(&repo);

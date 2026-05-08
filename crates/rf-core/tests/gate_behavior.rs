@@ -119,6 +119,24 @@ fn config_accepts_comment_with_required_alternative_or_impact() {
 }
 
 #[test]
+fn author_replies_are_not_residual_blockers() {
+    let mut scan = base_scan(
+        "Fixed in this PR. Added a regression test for the merge behavior and should be safe now.",
+    );
+    scan.pr.author = String::from("author");
+    scan.comments[0].author = String::from("author");
+    let config = GateConfigSnapshot {
+        require_evidence: false,
+        ..GateConfigSnapshot::default()
+    };
+
+    let gate = gate_scan(&scan, &config, &[]);
+
+    assert!(gate.residual_blockers.is_empty());
+    assert!(gate.candidate_blockers.is_empty());
+}
+
+#[test]
 fn residual_blockers_collapse_to_one_per_thread() {
     let mut scan = base_scan(
         "This can break the response contract in this PR because `partial` changes client handling.",

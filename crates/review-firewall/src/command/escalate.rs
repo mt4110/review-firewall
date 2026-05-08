@@ -5,6 +5,7 @@ use rf_core::{build_escalation_markdown, evaluate_escalation_candidates};
 
 use crate::adapter::git;
 use crate::command::CommandOutcome;
+use crate::io::config::ReviewFirewallConfig;
 use crate::io::{artifacts, config, run_store};
 
 pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
@@ -14,7 +15,7 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
     let scan =
         artifacts::read_json::<ScanArtifact>(run.directory.join("scan.json")).map_err(io_error)?;
 
-    let (status, reason, pr_number, candidates) = if let Some(scan) = scan {
+    let (mut status, mut reason, pr_number, candidates) = if let Some(scan) = scan {
         let candidates = evaluate_escalation_candidates(
             &scan.review_threads,
             policy.review.max_pr_thread_roundtrips,
@@ -30,6 +31,7 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
             Vec::new(),
         )
     };
+    merge_config_status(&mut status, &mut reason, &policy);
 
     let markdown = build_escalation_markdown(status, reason.as_deref(), pr_number, &candidates);
     artifacts::write_text(run.directory.join("escalation.md"), &markdown).map_err(io_error)?;
@@ -58,6 +60,23 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
         ],
         next: None,
     })
+}
+
+fn merge_config_status(
+    status: &mut Status,
+    reason: &mut Option<String>,
+    policy: &ReviewFirewallConfig,
+) {
+    if policy.status == Status::Ok {
+        return;
+    }
+    *status = status.merge(policy.status);
+    if reason.is_none() {
+        *reason = policy
+            .reason
+            .clone()
+            .or_else(|| Some(String::from("Config loaded with partial status")));
+    }
 }
 
 fn io_error(error: std::io::Error) -> String {

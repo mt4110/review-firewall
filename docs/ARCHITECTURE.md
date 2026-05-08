@@ -196,7 +196,7 @@ Collect and normalize:
 - repo root
 - branch
 - changed files
-- CODEOWNERS presence
+- CODEOWNERS presence from `.github/CODEOWNERS`, `CODEOWNERS`, or `docs/CODEOWNERS`
 - config presence
 - PR metadata via `gh`
 - review comments
@@ -220,6 +220,8 @@ Compute:
 - ownership advisory
 - aggregate counts
 
+The PR author's own comments may still be classified for context, but they are not extracted as residual blockers.
+
 Output:
 
 - `gate.json`
@@ -228,6 +230,7 @@ Output:
 ### `draft-reply`
 
 Generate concise author replies.
+If local config is partial, the command status and reason reflect that instead of silently using defaults.
 
 Output:
 
@@ -237,6 +240,7 @@ Output:
 ### `escalate`
 
 Turn long design threads into ADR/RFC draft material.
+If local config is partial, the command status and reason reflect that because the roundtrip threshold may have fallen back to defaults.
 
 Output:
 

@@ -12,27 +12,40 @@ pub struct CodeownersFile {
 }
 
 pub fn load(repo_root: &Path) -> CodeownersFile {
-    let path = repo_root.join(".github").join("CODEOWNERS");
-    match fs::read_to_string(&path) {
-        Ok(content) => {
-            let rules = content.lines().filter_map(parse_rule).collect::<Vec<_>>();
-            CodeownersFile {
-                found: true,
-                rules,
-                reason: None,
+    for path in codeowners_locations(repo_root) {
+        match fs::read_to_string(&path) {
+            Ok(content) => {
+                let rules = content.lines().filter_map(parse_rule).collect::<Vec<_>>();
+                return CodeownersFile {
+                    found: true,
+                    rules,
+                    reason: None,
+                };
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return CodeownersFile {
+                    found: false,
+                    rules: Vec::new(),
+                    reason: Some(error.to_string()),
+                };
             }
         }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => CodeownersFile {
-            found: false,
-            rules: Vec::new(),
-            reason: None,
-        },
-        Err(error) => CodeownersFile {
-            found: false,
-            rules: Vec::new(),
-            reason: Some(error.to_string()),
-        },
     }
+
+    CodeownersFile {
+        found: false,
+        rules: Vec::new(),
+        reason: None,
+    }
+}
+
+fn codeowners_locations(repo_root: &Path) -> [std::path::PathBuf; 3] {
+    [
+        repo_root.join(".github").join("CODEOWNERS"),
+        repo_root.join("CODEOWNERS"),
+        repo_root.join("docs").join("CODEOWNERS"),
+    ]
 }
 
 fn parse_rule(line: &str) -> Option<CodeownerRule> {

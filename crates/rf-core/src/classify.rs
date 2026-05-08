@@ -24,7 +24,9 @@ pub fn gate_scan(
     let candidate_blockers = classified
         .iter()
         .filter(|comment| {
-            comment.duplicate_of_comment_id.is_none() && is_candidate_blocker(comment, config)
+            comment.duplicate_of_comment_id.is_none()
+                && !is_pr_author_comment(&comment.comment, scan)
+                && is_candidate_blocker(comment, config)
         })
         .map(to_residual_blocker)
         .collect::<Vec<_>>();
@@ -82,6 +84,10 @@ pub fn gate_scan(
     }
 }
 
+fn is_pr_author_comment(comment: &CommentRecord, scan: &ScanArtifact) -> bool {
+    !scan.pr.author.is_empty() && comment.author == scan.pr.author
+}
+
 fn classify_comment(
     comment: &CommentRecord,
     scan: &ScanArtifact,
@@ -93,6 +99,7 @@ fn classify_comment(
     let evidence = extract_evidence(comment, scan);
     let present_pr_impact = extract_present_pr_impact(comment, scan, failure_mode.as_deref());
     let preference_only = is_preference_only(&comment.body, concern);
+    let author_comment = is_pr_author_comment(comment, scan);
     let ownership = build_ownership_advisory(
         comment.author.as_str(),
         comment.path.as_deref(),
@@ -101,7 +108,8 @@ fn classify_comment(
         config.use_codeowners,
     );
 
-    let candidate_blocker = (!config.require_concern || concern.is_some())
+    let candidate_blocker = !author_comment
+        && (!config.require_concern || concern.is_some())
         && (!config.require_failure_mode || failure_mode.is_some())
         && (!config.require_evidence || !evidence.is_empty())
         && !preference_only;
