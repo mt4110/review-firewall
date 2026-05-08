@@ -15,6 +15,7 @@ A blocker must include:
 
 Style, naming, familiarity, and personal preference are never blockers.
 
-After 2 back-and-forth replies, move design debate to issue/ADR.
+Escalate design debate when author/reviewer handoffs exceed `max_pr_thread_roundtrips`.
+With the default value of 2, the third handoff moves the debate to issue/ADR.
 
 If you are unsure whether a concern blocks this PR, prefer question over blocker.

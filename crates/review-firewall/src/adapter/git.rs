@@ -118,46 +118,55 @@ pub fn repository_identity(repo_root: &Path) -> RepositoryProbe {
 }
 
 pub fn changed_files(repo_root: &Path, base_branch: Option<&str>) -> PathsProbe {
-    let mut attempts = Vec::<Vec<String>>::new();
+    let mut paths = Vec::new();
+    let status_attempt = vec![
+        String::from("status"),
+        String::from("--porcelain=v1"),
+        String::from("-z"),
+        String::from("--untracked-files=all"),
+    ];
+    let status_output = run_process(repo_root, "git", &status_attempt);
+    let status_reason = if status_output.success {
+        merge_paths(&mut paths, parse_status_paths(&status_output.stdout));
+        None
+    } else {
+        Some(
+            status_output
+                .reason
+                .unwrap_or_else(|| fallback_reason(status_output.stderr, "git status failed")),
+        )
+    };
+
+    let mut base_attempts = Vec::<Vec<String>>::new();
     if let Some(base_branch) = base_branch {
-        attempts.push(vec![
+        base_attempts.push(vec![
             String::from("diff"),
             String::from("--name-only"),
             format!("origin/{base_branch}...HEAD"),
         ]);
-        attempts.push(vec![
+        base_attempts.push(vec![
             String::from("diff"),
             String::from("--name-only"),
             format!("{base_branch}...HEAD"),
         ]);
     }
-    attempts.push(vec![
-        String::from("status"),
-        String::from("--porcelain=v1"),
-        String::from("-z"),
-        String::from("--untracked-files=all"),
-    ]);
-    for attempt in attempts {
+    for attempt in base_attempts {
         let output = run_process(repo_root, "git", &attempt);
-        if !output.success {
-            continue;
+        if output.success {
+            merge_paths(&mut paths, parse_changed_paths(&output.stdout));
         }
-        let paths = if attempt.first().map(String::as_str) == Some("status") {
-            parse_status_paths(&output.stdout)
-        } else {
-            parse_changed_paths(&output.stdout)
+    }
+
+    if !paths.is_empty() {
+        return PathsProbe {
+            paths,
+            reason: None,
         };
-        if !paths.is_empty() {
-            return PathsProbe {
-                paths,
-                reason: None,
-            };
-        }
     }
 
     PathsProbe {
         paths: Vec::new(),
-        reason: Some(String::from("No local changed files detected")),
+        reason: status_reason.or_else(|| Some(String::from("No local changed files detected"))),
     }
 }
 
@@ -312,6 +321,14 @@ fn unique_paths(paths: Vec<String>) -> Vec<String> {
         }
     }
     unique
+}
+
+fn merge_paths(paths: &mut Vec<String>, supplemental: Vec<String>) {
+    for path in supplemental {
+        if !paths.iter().any(|existing| existing == &path) {
+            paths.push(path);
+        }
+    }
 }
 
 fn fallback_reason(stderr: String, fallback: &str) -> String {

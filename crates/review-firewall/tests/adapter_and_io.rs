@@ -186,7 +186,7 @@ fn git_status_parser_keeps_spaces_from_porcelain_z() {
 }
 
 #[test]
-fn git_changed_files_prefers_worktree_status_over_previous_commit() {
+fn git_changed_files_reads_worktree_status_without_commit_fallback() {
     let repo = temp_dir("changed-files-status");
     run_git(&repo, &["init", "--initial-branch=main"]);
     run_git(&repo, &["config", "user.email", "review-bot@example.com"]);
@@ -202,6 +202,30 @@ fn git_changed_files_prefers_worktree_status_over_previous_commit() {
     let changed = adapter::git::changed_files(&repo, None);
 
     assert_eq!(changed.paths, vec![String::from("current.rs")]);
+    assert!(changed.reason.is_none());
+}
+
+#[test]
+fn git_changed_files_merges_worktree_status_with_base_diff() {
+    let repo = temp_dir("changed-files-merge-base");
+    run_git(&repo, &["init", "--initial-branch=main"]);
+    run_git(&repo, &["config", "user.email", "review-bot@example.com"]);
+    run_git(&repo, &["config", "user.name", "Review Bot"]);
+    fs::write(repo.join("base.rs"), "base\n").expect("write base");
+    run_git(&repo, &["add", "base.rs"]);
+    run_git(&repo, &["commit", "-m", "base"]);
+    run_git(&repo, &["checkout", "-b", "feature"]);
+    fs::write(repo.join("pr.rs"), "pr\n").expect("write pr");
+    run_git(&repo, &["add", "pr.rs"]);
+    run_git(&repo, &["commit", "-m", "pr"]);
+    fs::write(repo.join("current.rs"), "worktree\n").expect("write current");
+
+    let changed = adapter::git::changed_files(&repo, Some("main"));
+
+    assert_eq!(
+        changed.paths,
+        vec![String::from("current.rs"), String::from("pr.rs")]
+    );
     assert!(changed.reason.is_none());
 }
 

@@ -61,7 +61,12 @@ fn timestamp_candidate(base_timestamp: &str, attempt: usize) -> String {
 }
 
 pub fn latest_or_create(repo_root: &Path) -> io::Result<RunDirectory> {
-    load_latest(repo_root)?.map_or_else(|| create_new(repo_root), Ok)
+    match load_latest(repo_root) {
+        Ok(Some(run)) => Ok(run),
+        Ok(None) => create_new(repo_root),
+        Err(error) if error.kind() == io::ErrorKind::InvalidData => create_new(repo_root),
+        Err(error) => Err(error),
+    }
 }
 
 pub fn load_latest(repo_root: &Path) -> io::Result<Option<RunDirectory>> {
@@ -143,7 +148,7 @@ mod tests {
     use std::env;
     use std::fs;
 
-    use super::{create_new, create_unique_run_directory_with_base, load_latest};
+    use super::{create_new, create_unique_run_directory_with_base, latest_or_create, load_latest};
 
     #[test]
     fn latest_pointer_uses_json() {
@@ -223,6 +228,33 @@ mod tests {
         let error = load_latest(&root).expect_err("unsafe latest should error");
 
         assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn latest_or_create_recovers_from_unsafe_latest_pointer() {
+        let root = env::temp_dir().join(format!(
+            "review-firewall-run-store-recover-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("unix time")
+                .as_nanos()
+        ));
+        let run_root = root.join(".review-firewall").join("run");
+        fs::create_dir_all(&run_root).expect("run dir");
+        fs::write(
+            run_root.join("latest.json"),
+            "{\n  \"timestamp\": \"../outside\"\n}\n",
+        )
+        .expect("write latest");
+
+        let run = latest_or_create(&root).expect("recover latest");
+        let loaded = load_latest(&root)
+            .expect("load recovered latest")
+            .expect("latest pointer");
+
+        assert_eq!(run.timestamp, loaded.timestamp);
+        assert_eq!(run.directory, loaded.directory);
+        assert!(run.directory.exists());
     }
 
     #[test]
