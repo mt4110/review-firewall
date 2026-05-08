@@ -4,7 +4,7 @@ use std::path::Path;
 use rf_core::domain::{
     CommentRecord, CommentSource, ProductBoundarySnapshot, PullRequestSummary, ScanArtifact, Status,
 };
-use rf_core::{build_conversation_threads, normalize_path};
+use rf_core::{build_conversation_threads_for_author, normalize_path};
 use serde_json::Value;
 
 use crate::adapter::{gh, git};
@@ -185,7 +185,11 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     }
                 }
 
-                review_threads = build_conversation_threads(&comments, &issue_comments);
+                review_threads = build_conversation_threads_for_author(
+                    &comments,
+                    &issue_comments,
+                    Some(pr.author.as_str()),
+                );
             } else if pr.number.is_some() && repository.identity.is_none() {
                 partial_sources.push(String::from("repository_identity"));
                 merge_probe_reason(

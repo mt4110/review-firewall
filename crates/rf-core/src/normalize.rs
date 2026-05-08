@@ -28,14 +28,29 @@ pub fn build_conversation_threads(
     review_comments: &[CommentRecord],
     issue_comments: &[CommentRecord],
 ) -> Vec<ReviewThread> {
-    let mut threads = build_review_threads(review_comments);
-    if let Some(issue_thread) = build_issue_comment_thread(issue_comments) {
+    build_conversation_threads_for_author(review_comments, issue_comments, None)
+}
+
+pub fn build_conversation_threads_for_author(
+    review_comments: &[CommentRecord],
+    issue_comments: &[CommentRecord],
+    pr_author: Option<&str>,
+) -> Vec<ReviewThread> {
+    let mut threads = build_review_threads_for_author(review_comments, pr_author);
+    if let Some(issue_thread) = build_issue_comment_thread(issue_comments, pr_author) {
         threads.push(issue_thread);
     }
     threads
 }
 
 pub fn build_review_threads(comments: &[CommentRecord]) -> Vec<ReviewThread> {
+    build_review_threads_for_author(comments, None)
+}
+
+pub fn build_review_threads_for_author(
+    comments: &[CommentRecord],
+    pr_author: Option<&str>,
+) -> Vec<ReviewThread> {
     let mut by_id = HashMap::new();
     for comment in comments {
         by_id.insert(comment.comment_id.clone(), comment.clone());
@@ -62,14 +77,17 @@ pub fn build_review_threads(comments: &[CommentRecord]) -> Vec<ReviewThread> {
                 root_comment_id: thread_id,
                 path,
                 participants,
-                roundtrips: count_roundtrips(&thread_comments),
+                roundtrips: count_roundtrips(&thread_comments, pr_author),
                 comments: thread_comments,
             }
         })
         .collect()
 }
 
-fn build_issue_comment_thread(comments: &[CommentRecord]) -> Option<ReviewThread> {
+fn build_issue_comment_thread(
+    comments: &[CommentRecord],
+    pr_author: Option<&str>,
+) -> Option<ReviewThread> {
     let mut thread_comments = comments.to_vec();
     if thread_comments.is_empty() {
         return None;
@@ -87,7 +105,7 @@ fn build_issue_comment_thread(comments: &[CommentRecord]) -> Option<ReviewThread
         root_comment_id,
         path: None,
         participants: unique_participants(&thread_comments),
-        roundtrips: count_roundtrips(&thread_comments),
+        roundtrips: count_roundtrips(&thread_comments, pr_author),
         comments: thread_comments,
     })
 }
@@ -103,12 +121,21 @@ fn resolve_root_comment_id(
             break;
         }
         let Some(parent) = by_id.get(reply_to) else {
-            break;
+            return fallback_thread_id(comment).unwrap_or_else(|| current.comment_id.clone());
         };
         visited.push(reply_to.clone());
         current = parent;
     }
     current.comment_id.clone()
+}
+
+fn fallback_thread_id(comment: &CommentRecord) -> Option<String> {
+    let thread_id = comment.thread_id.trim();
+    if thread_id.is_empty() {
+        None
+    } else {
+        Some(thread_id.to_owned())
+    }
 }
 
 fn sort_comment_records(left: &CommentRecord, right: &CommentRecord) -> std::cmp::Ordering {
@@ -130,7 +157,46 @@ fn unique_participants(comments: &[CommentRecord]) -> Vec<String> {
     participants
 }
 
-fn count_roundtrips(comments: &[CommentRecord]) -> usize {
+fn count_roundtrips(comments: &[CommentRecord], pr_author: Option<&str>) -> usize {
+    let Some(pr_author) = pr_author.map(str::trim).filter(|author| !author.is_empty()) else {
+        return count_author_changes(comments);
+    };
+
+    let mut previous = None::<CommentSide>;
+    let mut roundtrips = 0;
+    for comment in comments {
+        let Some(side) = comment_side(&comment.author, pr_author) else {
+            continue;
+        };
+        if let Some(previous_side) = previous
+            && previous_side != side
+        {
+            roundtrips += 1;
+        }
+        previous = Some(side);
+    }
+    roundtrips
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CommentSide {
+    PullRequestAuthor,
+    Reviewer,
+}
+
+fn comment_side(author: &str, pr_author: &str) -> Option<CommentSide> {
+    let author = author.trim();
+    if author.is_empty() {
+        return None;
+    }
+    if author.eq_ignore_ascii_case(pr_author) {
+        Some(CommentSide::PullRequestAuthor)
+    } else {
+        Some(CommentSide::Reviewer)
+    }
+}
+
+fn count_author_changes(comments: &[CommentRecord]) -> usize {
     let mut previous = String::new();
     let mut roundtrips = 0;
     for comment in comments {
@@ -153,7 +219,10 @@ fn count_roundtrips(comments: &[CommentRecord]) -> usize {
 mod tests {
     use crate::domain::{CommentRecord, CommentSource};
 
-    use super::{build_conversation_threads, build_review_threads, normalize_path};
+    use super::{
+        build_conversation_threads, build_conversation_threads_for_author, build_review_threads,
+        build_review_threads_for_author, normalize_path,
+    };
 
     #[test]
     fn normalizes_windows_paths() {
@@ -195,6 +264,65 @@ mod tests {
     }
 
     #[test]
+    fn preserves_normalized_thread_id_when_parent_is_missing() {
+        let comments = vec![
+            CommentRecord {
+                comment_id: "1".into(),
+                thread_id: "1".into(),
+                author: "reviewer".into(),
+                body: "This can break".into(),
+                path: Some("src/lib.rs".into()),
+                source: CommentSource::ReviewComment,
+                reply_to_comment_id: None,
+                created_at: Some("2026-03-28T00:00:00Z".into()),
+                line: Some(1),
+                original_line: Some(1),
+            },
+            CommentRecord {
+                comment_id: "3".into(),
+                thread_id: "1".into(),
+                author: "author".into(),
+                body: "Reply whose immediate parent is outside this page.".into(),
+                path: Some("src/lib.rs".into()),
+                source: CommentSource::ReviewComment,
+                reply_to_comment_id: Some("2".into()),
+                created_at: Some("2026-03-28T00:00:02Z".into()),
+                line: Some(1),
+                original_line: Some(1),
+            },
+        ];
+
+        let threads = build_review_threads(&comments);
+
+        assert_eq!(threads.len(), 1);
+        assert_eq!(threads[0].root_comment_id, "1");
+        assert_eq!(
+            threads[0]
+                .comments
+                .iter()
+                .map(|comment| comment.comment_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["1", "3"]
+        );
+    }
+
+    #[test]
+    fn counts_author_reviewer_handoffs_when_author_is_known() {
+        let comments = vec![
+            review_comment("1", "reviewer-a", None, "2026-03-28T00:00:00Z"),
+            review_comment("2", "reviewer-b", Some("1"), "2026-03-28T00:00:01Z"),
+            review_comment("3", "author", Some("1"), "2026-03-28T00:00:02Z"),
+            review_comment("4", "reviewer-c", Some("1"), "2026-03-28T00:00:03Z"),
+            review_comment("5", "reviewer-d", Some("1"), "2026-03-28T00:00:04Z"),
+        ];
+
+        let threads = build_review_threads_for_author(&comments, Some("author"));
+
+        assert_eq!(threads.len(), 1);
+        assert_eq!(threads[0].roundtrips, 2);
+    }
+
+    #[test]
     fn folds_issue_comments_into_a_pseudo_thread() {
         let issue_comments = vec![
             CommentRecord {
@@ -229,5 +357,55 @@ mod tests {
         assert_eq!(threads[0].thread_id, "issue:10");
         assert_eq!(threads[0].roundtrips, 1);
         assert_eq!(threads[0].participants, vec!["reviewer", "author"]);
+    }
+
+    #[test]
+    fn issue_comment_roundtrips_use_author_reviewer_handoffs() {
+        let issue_comments = vec![
+            issue_comment("10", "reviewer-a", "2026-03-28T00:00:00Z"),
+            issue_comment("11", "reviewer-b", "2026-03-28T00:00:01Z"),
+            issue_comment("12", "author", "2026-03-28T00:00:02Z"),
+            issue_comment("13", "reviewer-c", "2026-03-28T00:00:03Z"),
+        ];
+
+        let threads = build_conversation_threads_for_author(&[], &issue_comments, Some("author"));
+
+        assert_eq!(threads.len(), 1);
+        assert_eq!(threads[0].roundtrips, 2);
+    }
+
+    fn review_comment(
+        comment_id: &str,
+        author: &str,
+        reply_to_comment_id: Option<&str>,
+        created_at: &str,
+    ) -> CommentRecord {
+        CommentRecord {
+            comment_id: comment_id.into(),
+            thread_id: comment_id.into(),
+            author: author.into(),
+            body: "Body".into(),
+            path: Some("src/lib.rs".into()),
+            source: CommentSource::ReviewComment,
+            reply_to_comment_id: reply_to_comment_id.map(Into::into),
+            created_at: Some(created_at.into()),
+            line: Some(1),
+            original_line: Some(1),
+        }
+    }
+
+    fn issue_comment(comment_id: &str, author: &str, created_at: &str) -> CommentRecord {
+        CommentRecord {
+            comment_id: comment_id.into(),
+            thread_id: String::new(),
+            author: author.into(),
+            body: "Issue body".into(),
+            path: None,
+            source: CommentSource::IssueComment,
+            reply_to_comment_id: None,
+            created_at: Some(created_at.into()),
+            line: None,
+            original_line: None,
+        }
     }
 }
