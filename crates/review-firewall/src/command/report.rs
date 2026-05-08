@@ -19,30 +19,12 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
         .map_err(io_error)?;
     let escalation = artifacts::read_text(run.directory.join("escalation.md")).map_err(io_error)?;
 
-    let (status, reason) = if let Some(scan) = scan.as_ref() {
-        if gate.is_none() || draft.is_none() || escalation.is_none() {
-            (
-                scan.status.merge(Status::Partial),
-                Some(String::from("One or more upstream artifacts are missing")),
-            )
-        } else {
-            (
-                gate.as_ref()
-                    .map(|artifact| artifact.status)
-                    .unwrap_or(scan.status),
-                gate.as_ref()
-                    .and_then(|artifact| artifact.reason.clone())
-                    .or_else(|| scan.reason.clone()),
-            )
-        }
-    } else {
-        (
-            Status::Error,
-            Some(String::from(
-                "scan.json not found; run review-firewall scan first",
-            )),
-        )
-    };
+    let (status, reason) = report_status_and_reason(
+        scan.as_ref(),
+        gate.as_ref(),
+        draft.as_ref(),
+        escalation.as_deref(),
+    );
 
     let markdown = build_report_markdown(
         status,
@@ -79,6 +61,72 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
         ],
         next: None,
     })
+}
+
+fn report_status_and_reason(
+    scan: Option<&ScanArtifact>,
+    gate: Option<&GateArtifact>,
+    draft: Option<&DraftReplyArtifact>,
+    escalation: Option<&str>,
+) -> (Status, Option<String>) {
+    let Some(scan) = scan else {
+        return (
+            Status::Error,
+            Some(String::from(
+                "scan.json not found; run review-firewall scan first",
+            )),
+        );
+    };
+
+    if gate.is_none() || draft.is_none() || escalation.is_none() {
+        return (
+            scan.status.merge(Status::Partial),
+            Some(String::from("One or more upstream artifacts are missing")),
+        );
+    }
+
+    let escalation_status = escalation
+        .and_then(markdown_status)
+        .unwrap_or(Status::Partial);
+    let escalation_reason = escalation.and_then(markdown_reason).or_else(|| {
+        if escalation.and_then(markdown_status).is_none() {
+            Some(String::from("escalation.md is missing STATUS"))
+        } else {
+            None
+        }
+    });
+    let gate = gate.expect("checked gate");
+    let draft = draft.expect("checked draft");
+    let status = scan
+        .status
+        .merge(gate.status)
+        .merge(draft.status)
+        .merge(escalation_status);
+    let reason = gate
+        .reason
+        .clone()
+        .or_else(|| draft.reason.clone())
+        .or_else(|| escalation_reason.clone())
+        .or_else(|| scan.reason.clone());
+
+    (status, reason)
+}
+
+fn markdown_status(markdown: &str) -> Option<Status> {
+    markdown.lines().find_map(|line| match line.trim() {
+        "STATUS: OK" => Some(Status::Ok),
+        "STATUS: PARTIAL" => Some(Status::Partial),
+        "STATUS: ERROR" => Some(Status::Error),
+        _ => None,
+    })
+}
+
+fn markdown_reason(markdown: &str) -> Option<String> {
+    markdown
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("REASON: "))
+        .filter(|reason| !reason.is_empty())
+        .map(ToOwned::to_owned)
 }
 
 fn io_error(error: std::io::Error) -> String {

@@ -249,6 +249,7 @@ Output:
 ### `report`
 
 Produce final engineer + PM + author outputs.
+The report command merges status from scan, gate, draft-reply, and escalation artifacts so final output cannot hide a partial downstream command.
 
 Output:
 
@@ -305,6 +306,7 @@ Why `latest.json` instead of symlink:
 - easier deterministic tests
 
 Run directory timestamps include nanosecond precision so repeated `scan` executions do not reuse the same directory.
+When `latest.json` is read back, the timestamp must match a generated run-directory name before it is joined to the run root.
 
 ## Testing strategy
 

@@ -275,15 +275,20 @@ fn config_partial_status_reaches_reply_and_escalation_commands() {
 
     let draft = run_with_path(&repo, &gh_stub, &["draft-reply"]);
     let escalate = run_with_path(&repo, &gh_stub, &["escalate"]);
+    let report = run_with_path(&repo, &gh_stub, &["report"]);
 
     assert!(draft.status.success());
     assert!(escalate.status.success());
+    assert!(report.status.success());
     let draft_stdout = String::from_utf8_lossy(&draft.stdout);
     let escalate_stdout = String::from_utf8_lossy(&escalate.stdout);
+    let report_stdout = String::from_utf8_lossy(&report.stdout);
     assert!(draft_stdout.contains("STATUS: PARTIAL"));
     assert!(draft_stdout.contains("REASON: Invalid config value"));
     assert!(escalate_stdout.contains("STATUS: PARTIAL"));
     assert!(escalate_stdout.contains("REASON: Invalid config value"));
+    assert!(report_stdout.contains("STATUS: PARTIAL"));
+    assert!(report_stdout.contains("REASON: Invalid config value"));
 }
 
 #[test]
