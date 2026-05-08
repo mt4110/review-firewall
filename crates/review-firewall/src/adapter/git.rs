@@ -84,6 +84,50 @@ pub fn current_branch(repo_root: &Path) -> StringProbe {
     }
 }
 
+pub fn fallback_base_branch(repo_root: &Path) -> StringProbe {
+    let origin_head = run_process(
+        repo_root,
+        "git",
+        &[
+            String::from("symbolic-ref"),
+            String::from("--quiet"),
+            String::from("--short"),
+            String::from("refs/remotes/origin/HEAD"),
+        ],
+    );
+    if origin_head.success {
+        let branch = origin_head
+            .stdout
+            .trim()
+            .strip_prefix("origin/")
+            .unwrap_or(origin_head.stdout.trim())
+            .to_owned();
+        if !branch.is_empty() {
+            return StringProbe {
+                value: branch,
+                reason: None,
+            };
+        }
+    }
+
+    for candidate in ["main", "master"] {
+        if ref_exists(repo_root, &format!("origin/{candidate}")) || ref_exists(repo_root, candidate)
+        {
+            return StringProbe {
+                value: candidate.to_owned(),
+                reason: None,
+            };
+        }
+    }
+
+    StringProbe {
+        value: String::new(),
+        reason: Some(String::from(
+            "Could not infer a base branch for local changed-file diff",
+        )),
+    }
+}
+
 pub fn repository_identity(repo_root: &Path) -> RepositoryProbe {
     let output = run_process(
         repo_root,
@@ -137,36 +181,82 @@ pub fn changed_files(repo_root: &Path, base_branch: Option<&str>) -> PathsProbe 
         )
     };
 
-    let mut base_attempts = Vec::<Vec<String>>::new();
-    if let Some(base_branch) = base_branch {
-        base_attempts.push(vec![
-            String::from("diff"),
-            String::from("--name-only"),
-            format!("origin/{base_branch}...HEAD"),
-        ]);
-        base_attempts.push(vec![
-            String::from("diff"),
-            String::from("--name-only"),
-            format!("{base_branch}...HEAD"),
-        ]);
-    }
-    for attempt in base_attempts {
-        let output = run_process(repo_root, "git", &attempt);
-        if output.success {
-            merge_paths(&mut paths, parse_changed_paths(&output.stdout));
+    let mut base_diff_failed_reasons = Vec::new();
+    let mut base_diff_succeeded = false;
+    if let Some(base_branch) = base_branch.filter(|value| !value.trim().is_empty()) {
+        let base_attempts = vec![
+            vec![
+                String::from("diff"),
+                String::from("--name-only"),
+                format!("origin/{base_branch}...HEAD"),
+            ],
+            vec![
+                String::from("diff"),
+                String::from("--name-only"),
+                format!("{base_branch}...HEAD"),
+            ],
+        ];
+        for attempt in base_attempts {
+            let output = run_process(repo_root, "git", &attempt);
+            if output.success {
+                base_diff_succeeded = true;
+                merge_paths(&mut paths, parse_changed_paths(&output.stdout));
+            } else {
+                base_diff_failed_reasons.push(
+                    output
+                        .reason
+                        .unwrap_or_else(|| fallback_reason(output.stderr, "git diff failed")),
+                );
+            }
         }
     }
 
-    if !paths.is_empty() {
-        return PathsProbe {
-            paths,
-            reason: None,
+    let base_reason =
+        if base_branch.is_some() && !base_diff_succeeded && !base_diff_failed_reasons.is_empty() {
+            Some(format!(
+                "Could not diff against base branch '{}': {}",
+                base_branch.unwrap_or_default(),
+                summarize_reasons(&base_diff_failed_reasons)
+            ))
+        } else {
+            None
         };
-    }
 
     PathsProbe {
-        paths: Vec::new(),
-        reason: status_reason,
+        paths,
+        reason: combine_reasons(status_reason, base_reason),
+    }
+}
+
+fn ref_exists(repo_root: &Path, reference: &str) -> bool {
+    let output = run_process(
+        repo_root,
+        "git",
+        &[
+            String::from("rev-parse"),
+            String::from("--verify"),
+            String::from("--quiet"),
+            reference.to_owned(),
+        ],
+    );
+    output.success
+}
+
+fn summarize_reasons(reasons: &[String]) -> String {
+    reasons
+        .iter()
+        .map(|reason| reason.trim())
+        .find(|reason| !reason.is_empty())
+        .unwrap_or("git diff failed")
+        .to_owned()
+}
+
+fn combine_reasons(first: Option<String>, second: Option<String>) -> Option<String> {
+    match (first, second) {
+        (Some(first), Some(second)) => Some(format!("{first}; {second}")),
+        (Some(first), None) => Some(first),
+        (None, Some(second)) => Some(second),
+        (None, None) => None,
     }
 }
 

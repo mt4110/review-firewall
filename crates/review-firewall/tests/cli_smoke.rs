@@ -407,6 +407,18 @@ fn config_partial_status_reaches_reply_and_escalation_commands() {
 fn stopless_partial_path_still_writes_artifacts() {
     let repo = temp_dir("smoke-error");
     init_repo(&repo);
+    run(Command::new("git")
+        .args(["checkout", "-b", "feature/local-only"])
+        .current_dir(&repo));
+    fs::write(
+        repo.join("src").join("local_only.rs"),
+        "pub fn local_only_change() {}\n",
+    )
+    .expect("write local-only source");
+    run(Command::new("git").args(["add", "."]).current_dir(&repo));
+    run(Command::new("git")
+        .args(["commit", "-m", "local-only change"])
+        .current_dir(&repo));
     let gh_stub = install_gh_error_stub(&repo);
 
     for args in [
@@ -438,6 +450,7 @@ fn stopless_partial_path_still_writes_artifacts() {
 
     assert!(scan.contains(r#""status": "PARTIAL""#));
     assert!(scan.contains("gh stub failure"));
+    assert!(scan.contains("src/local_only.rs"));
     assert!(report.contains("STATUS: PARTIAL"));
 }
 

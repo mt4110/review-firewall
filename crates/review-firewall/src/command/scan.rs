@@ -213,8 +213,17 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                 Some(error),
                 Status::Partial,
             );
-            let local_changed = git::changed_files(&repo_root.path, None);
+            let fallback_base_branch = git::fallback_base_branch(&repo_root.path);
+            let base_branch = non_empty_base_branch(&fallback_base_branch.value);
+            let local_changed = git::changed_files(&repo_root.path, base_branch);
             changed_files = local_changed.paths;
+            merge_probe_reason(
+                &mut status,
+                &mut reason,
+                &mut warnings,
+                fallback_base_branch.reason,
+                Status::Partial,
+            );
             merge_probe_reason(
                 &mut status,
                 &mut reason,
@@ -538,6 +547,11 @@ fn merge_probe_reason(
 
 fn io_error(error: std::io::Error) -> String {
     error.to_string()
+}
+
+fn non_empty_base_branch(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    (!trimmed.is_empty()).then_some(trimmed)
 }
 
 fn yes_no(value: bool) -> &'static str {
