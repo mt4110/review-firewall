@@ -1,0 +1,8 @@
+target/
+.review-firewall/
+.DS_Store
+*.DS_Store
+review-firewall-*.md
+review-firewall-*.txt
+.gemini/
+.codex/

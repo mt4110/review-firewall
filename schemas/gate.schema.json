@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GateArtifact",
+  "type": "object",
+  "required": ["status", "comments_analyzed", "residual_blockers", "counts"],
+  "properties": {
+    "status": { "enum": ["OK", "PARTIAL", "ERROR"] },
+    "reason": { "type": "string" },
+    "comments_analyzed": { "type": "integer", "minimum": 0 },
+    "residual_blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["comment_id", "concern", "failure_mode", "evidence", "owner_match", "ownership_scope", "advisory_weight"],
+        "properties": {
+          "comment_id": { "type": ["integer", "string"] },
+          "concern": { "enum": ["correctness", "security", "performance", "operability", "api"] },
+          "failure_mode": { "type": "string" },
+          "evidence": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
+          },
+          "owner_match": { "type": "boolean" },
+          "ownership_scope": { "enum": ["exact", "partial", "none"] },
+          "advisory_weight": { "enum": ["high", "medium", "low"] }
+        },
+        "additionalProperties": true
+      }
+    },
+    "counts": {
+      "type": "object",
+      "required": ["questions", "suggestions", "nits", "praise"],
+      "properties": {
+        "questions": { "type": "integer", "minimum": 0 },
+        "suggestions": { "type": "integer", "minimum": 0 },
+        "nits": { "type": "integer", "minimum": 0 },
+        "praise": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

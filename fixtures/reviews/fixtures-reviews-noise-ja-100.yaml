@@ -1,0 +1,1009 @@
+version: 1
+kind: synthetic_review_noise_cases
+language: ja
+notes:
+- 外向けファイル名は shoumonai ではなく noise / preference / process_pressure / scope_drift を推奨。
+- これは実際の過去PRの再現ではなく、レビュー摩擦パターンを固定する synthetic fixtures。
+- この100件は全て non-blocking 側の訓練用ケース。
+- 次段で true blocker 側の対照ケースを別ファイルで追加すると classifier の精度を見やすい。
+cases:
+- id: noise_001
+  category: naming_style
+  comment_ja: 変数名がちょっとダサい気がします。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 好みのみ。
+- id: noise_002
+  category: naming_style
+  comment_ja: この関数名、個人的にはしっくりこないです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 好みのみ。
+- id: noise_003
+  category: naming_style
+  comment_ja: true/false の変数は is_ から始めたいです。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: ローカル規約の提案であり blocker ではない。
+- id: noise_004
+  category: naming_style
+  comment_ja: この enum の variant 名、前のPJに合わせませんか。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 前職/前PJ由来の慣れ。
+- id: noise_005
+  category: naming_style
+  comment_ja: helper という名前が雑なので全部 rename したいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 改善提案だが今PRを止める根拠ではない。
+- id: noise_006
+  category: naming_style
+  comment_ja: 略語をやめてフルスペルにしてほしいです。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: スタイル寄り。
+- id: noise_007
+  category: naming_style
+  comment_ja: 命名規則が統一されてない気がするので気になります。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 違和感の共有だけで blocker ではない。
+- id: noise_008
+  category: naming_style
+  comment_ja: このフィールド名、もう少しエレガントにできませんか。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 美意識の問題。
+- id: noise_009
+  category: naming_style
+  comment_ja: logger じゃなくて log にしたい派です。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 個人の好み。
+- id: noise_010
+  category: naming_style
+  comment_ja: ここ camelCase じゃなく snake_case に寄せたいです。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 規約提案であり blocker ではない。
+- id: noise_011
+  category: structure_layout
+  comment_ja: ディレクトリ名を utils にまとめた方がわかりやすい気がします。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 構成の好み。
+- id: noise_012
+  category: structure_layout
+  comment_ja: このファイル、なんとなく階層が深いので気になります。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 感覚的な違和感。
+- id: noise_013
+  category: structure_layout
+  comment_ja: lib 配下より common 配下の方がしっくりきます。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 好みの配置論。
+- id: noise_014
+  category: structure_layout
+  comment_ja: 1ファイル1責務にしたいので分割しませんか。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 一般論だが failure mode がない。
+- id: noise_015
+  category: structure_layout
+  comment_ja: この module 名、package と揃えたいです。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 見た目の統一。
+- id: noise_016
+  category: structure_layout
+  comment_ja: フォルダ順が見づらいので並び替えたいです。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 整列の好み。
+- id: noise_017
+  category: structure_layout
+  comment_ja: src/domain ではなく src/models にしたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 命名/構成の好み。
+- id: noise_018
+  category: structure_layout
+  comment_ja: このディレクトリ、将来的に増えそうなので今のうちに切りたいです。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 将来懸念だけでは blocker ではない。
+- id: noise_019
+  category: structure_layout
+  comment_ja: ファイル名に数字を入れたくないです。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: スタイルのみ。
+- id: noise_020
+  category: structure_layout
+  comment_ja: README の順番に合わせてフォルダも入れ替えたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 文書都合の提案。
+- id: noise_021
+  category: context_not_read
+  comment_ja: 'nits: そもそも cache をなぜ使っていますか？'
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 説明を読んでいない可能性が高い質問。
+- id: noise_022
+  category: context_not_read
+  comment_ja: テストが足りない気がします。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 既存テストを未確認の可能性。
+- id: noise_023
+  category: context_not_read
+  comment_ja: このコメントアウト、何のためですか？
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: コード内コメントやPR本文を未読の可能性。
+- id: noise_024
+  category: context_not_read
+  comment_ja: なぜ branch を切り直したんですか？
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: PR本体ではなく運用質問。
+- id: noise_025
+  category: context_not_read
+  comment_ja: rollback 手順ありますか？
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: PR本文に既記載なら未読質問。
+- id: noise_026
+  category: context_not_read
+  comment_ja: ログ多すぎでは？
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 目的や運用前提未読の可能性。
+- id: noise_027
+  category: context_not_read
+  comment_ja: この TODO は消し忘れですか？
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 既存の説明があれば非blocker。
+- id: noise_028
+  category: context_not_read
+  comment_ja: コメントに書いてあるけど、結局何してるんですか？
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: まずは読むべきで blocker ではない。
+- id: noise_029
+  category: context_not_read
+  comment_ja: PR 説明が長いので読んでないですが、要するに何ですか？
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: レビュー以前の読み飛ばし。
+- id: noise_030
+  category: context_not_read
+  comment_ja: この migration、なんで必要なんですか？
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 本文や issue 文脈未読の可能性。
+- id: noise_031
+  category: process_theater
+  comment_ja: セルフレビューしてから出してもらえると助かります。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: プロセス要求であり code blocker ではない。
+- id: noise_032
+  category: process_theater
+  comment_ja: コメントが少ないので、もう少し自己説明を書いてほしいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: コメント量の要求。
+- id: noise_033
+  category: process_theater
+  comment_ja: 一旦 rebase してからじゃないと見ないです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 運用の都合。
+- id: noise_034
+  category: process_theater
+  comment_ja: PR をもっと小さくして出し直してください。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 将来改善にはなるが現PRの blocker とは限らない。
+- id: noise_035
+  category: process_theater
+  comment_ja: 先に全コメント resolve してから再レビューします。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 会話運用。
+- id: noise_036
+  category: process_theater
+  comment_ja: とりあえず他の人にも投げておいてください。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 責任分散の要求。
+- id: noise_037
+  category: process_theater
+  comment_ja: レビューしやすいように commit をもっと分けてほしいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 運用改善だが blocker ではない。
+- id: noise_038
+  category: process_theater
+  comment_ja: PR タイトルの付け方をテンプレ準拠にしてください。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: メタ情報。
+- id: noise_039
+  category: process_theater
+  comment_ja: まず issue を切ってから PR を開いてほしいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: プロセス要求。
+- id: noise_040
+  category: process_theater
+  comment_ja: 自己レビューコメントを各 commit に付けてもらえますか。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: プロセス強化であり blocker ではない。
+- id: noise_041
+  category: vague_risk
+  comment_ja: なんか危ない気がします。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: failure mode がない。
+- id: noise_042
+  category: vague_risk
+  comment_ja: ちょっと嫌な感じがするので止めたいです。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 感覚だけでは blocker 不可。
+- id: noise_043
+  category: vague_risk
+  comment_ja: 将来的に困りそうなので気になります。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 将来懸念のみ。
+- id: noise_044
+  category: vague_risk
+  comment_ja: バグりそうではあります。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 再現条件がない。
+- id: noise_045
+  category: vague_risk
+  comment_ja: 違和感があるので再考したいです。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 違和感のみ。
+- id: noise_046
+  category: vague_risk
+  comment_ja: これ本当に大丈夫ですか？
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 根拠なき不安。
+- id: noise_047
+  category: vague_risk
+  comment_ja: 以前こういうので痛い目を見たので怖いです。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 過去体験だけでは証拠にならない。
+- id: noise_048
+  category: vague_risk
+  comment_ja: 一応 blocker で。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: blocker の必須要件を満たさない。
+- id: noise_049
+  category: vague_risk
+  comment_ja: 説明は難しいんですが危険寄りです。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 説明できない blocker は通さない。
+- id: noise_050
+  category: vague_risk
+  comment_ja: 直感ですがこの実装は嫌です。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 主観のみ。
+- id: noise_051
+  category: design_offtopic
+  comment_ja: この機会に event-driven に寄せませんか。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: 設計論点であり PR ローカルではない。
+- id: noise_052
+  category: design_offtopic
+  comment_ja: 今のうちに抽象化レイヤを1枚増やしたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: 設計論争。
+- id: noise_053
+  category: design_offtopic
+  comment_ja: REST じゃなくて gRPC にした方が長期的に良い気がします。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: API 方針の話。
+- id: noise_054
+  category: design_offtopic
+  comment_ja: この PR とは別に DB モデルを全面的に見直したいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: スコープ外の設計。
+- id: noise_055
+  category: design_offtopic
+  comment_ja: 責務の切り方から再検討したいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: 責務分割は ADR 向き。
+- id: noise_056
+  category: design_offtopic
+  comment_ja: インターフェース先行に寄せるべきでは。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: アーキ論争。
+- id: noise_057
+  category: design_offtopic
+  comment_ja: この層構造そのものが微妙なので、まずそこを議論したいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: PR で決めるには重い。
+- id: noise_058
+  category: design_offtopic
+  comment_ja: Repository パターンに寄せるなら全部そうしたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: 一貫した設計議論。
+- id: noise_059
+  category: design_offtopic
+  comment_ja: ドメイン境界をこの PR で決め切りたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: 境界設計は別トラック。
+- id: noise_060
+  category: design_offtopic
+  comment_ja: 本当はこのコンポーネント自体なくしたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: 存在理由レベルは ADR 行き。
+- id: noise_061
+  category: retroactive_rules
+  comment_ja: 最近はこの命名に統一しているので合わせてください。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 後出しルール。
+- id: noise_062
+  category: retroactive_rules
+  comment_ja: 前回から util 配下は禁止です。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 既存ルール化されていなければ blocker ではない。
+- id: noise_063
+  category: retroactive_rules
+  comment_ja: ログはINFOじゃなく全部DEBUGにする運用です。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: ローカル規約の共有。
+- id: noise_064
+  category: retroactive_rules
+  comment_ja: 最近この書き方は非推奨ということになりました。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 根拠と明文化が必要。
+- id: noise_065
+  category: retroactive_rules
+  comment_ja: もう shared に置かない方向なので移してほしいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 方針転換の告知。
+- id: noise_066
+  category: retroactive_rules
+  comment_ja: このテンプレに合わせるのが今の流れです。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 流れだけでは blocker 不可。
+- id: noise_067
+  category: retroactive_rules
+  comment_ja: 今後はレビューコメントに全部返答する運用です。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 運用ルールの通知。
+- id: noise_068
+  category: retroactive_rules
+  comment_ja: この層では Result を返さない方針になりました。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 明文化前なら提案扱い。
+- id: noise_069
+  category: retroactive_rules
+  comment_ja: 新しい lint ルールに寄せたいので直してほしいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: CI で強制されていない限り blocker ではない。
+- id: noise_070
+  category: retroactive_rules
+  comment_ja: 先週から命名ルールが変わっています。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: ソース・適用範囲の確認が必要。
+- id: noise_071
+  category: perf_cache
+  comment_ja: cache をなぜ使っていますか？
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 文脈説明を読んでいないなら非blocker。
+- id: noise_072
+  category: perf_cache
+  comment_ja: Mutex を使うと遅そうなのでやめませんか。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 実測や failure mode がない。
+- id: noise_073
+  category: perf_cache
+  comment_ja: Arc が多くて嫌です。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 感覚論。
+- id: noise_074
+  category: perf_cache
+  comment_ja: clone しているのでパフォーマンスが不安です。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 具体的な影響がない。
+- id: noise_075
+  category: perf_cache
+  comment_ja: メモリ配置が微妙な気がします。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 低レイヤー論点だが PR-local impact が不明。
+- id: noise_076
+  category: perf_cache
+  comment_ja: キャッシュ局所性まで考えると別実装の方が綺麗です。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: 設計寄りの将来論。
+- id: noise_077
+  category: perf_cache
+  comment_ja: このレベルで inline しないのはなぜですか。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 最適化嗜好。
+- id: noise_078
+  category: perf_cache
+  comment_ja: alloc が増えそうで嫌ですね。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 計測なし。
+- id: noise_079
+  category: perf_cache
+  comment_ja: 将来 hot path になりそうなので今のうちに直したいです。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 将来懸念のみ。
+- id: noise_080
+  category: perf_cache
+  comment_ja: ベンチはないですが遅い気がします。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 証拠なし。
+- id: noise_081
+  category: managerial_pressure
+  comment_ja: 細かいことはいいので早く片付けたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 進行圧力であり code review signal ではない。
+- id: noise_082
+  category: managerial_pressure
+  comment_ja: コメントが少ないとレビューした感がないので、もう少し何か言いたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: コメント数ノルマ。
+- id: noise_083
+  category: managerial_pressure
+  comment_ja: ここまで説明されると重いので要点だけにしてもらえますか。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 説明量の要望。
+- id: noise_084
+  category: managerial_pressure
+  comment_ja: 今そこ深掘りしなくていいですよね。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: 場の切り分けであり blocker ではない。
+- id: noise_085
+  category: managerial_pressure
+  comment_ja: 顧客には分からないのでこのままでいいのでは。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: リスク評価不在。
+- id: noise_086
+  category: managerial_pressure
+  comment_ja: 営業的には今日中に閉じたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 納期圧力。
+- id: noise_087
+  category: managerial_pressure
+  comment_ja: その論点を出すと話が長くなるので今は触れないでください。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: 論点退避の相談。
+- id: noise_088
+  category: managerial_pressure
+  comment_ja: そこまで考えなくていいと思います。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 深さへの反応であり根拠がない。
+- id: noise_089
+  category: managerial_pressure
+  comment_ja: まず通して、あとで考えましょう。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 後回し提案。
+- id: noise_090
+  category: managerial_pressure
+  comment_ja: これ以上議論すると遅れるので close したいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: move
+    escalate: move_to_adr
+  reason_ja: 進行判断であって blocker ではない。
+- id: noise_091
+  category: social_friction
+  comment_ja: 普通はこんな書き方しないです。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 一般論で威圧しているだけ。
+- id: noise_092
+  category: social_friction
+  comment_ja: これ Slack で話題になってましたよ。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 社会的圧力であり技術的根拠ではない。
+- id: noise_093
+  category: social_friction
+  comment_ja: 前にも同じこと言いましたよね。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 履歴圧力。
+- id: noise_094
+  category: social_friction
+  comment_ja: 読む人の気持ちを考えると無理です。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 感情表現のみ。
+- id: noise_095
+  category: social_friction
+  comment_ja: これだと新人が混乱するので嫌です。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 具体的 failure mode がない。
+- id: noise_096
+  category: social_friction
+  comment_ja: こういうの、ちょっとセンスないです。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 侮辱寄りで signal がない。
+- id: noise_097
+  category: social_friction
+  comment_ja: 好みじゃないので戻したいです。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 完全に好み。
+- id: noise_098
+  category: social_friction
+  comment_ja: 自分ならこうは書かないです。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 自己流の提示のみ。
+- id: noise_099
+  category: social_friction
+  comment_ja: この PR、見ていてしんどいです。
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 感想であり blocker ではない。
+- id: noise_100
+  category: social_friction
+  comment_ja: まあ動くならいいんじゃないですか。
+  expected:
+    type: praise
+    blocker: false
+    concern: null
+    reply: accept
+    escalate: stay_in_pr
+  reason_ja: 弱い称賛または通過コメントで、blocker ではない。
