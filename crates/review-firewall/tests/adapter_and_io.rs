@@ -155,6 +155,30 @@ fn codeowners_detection_preserves_empty_owner_overrides() {
 }
 
 #[test]
+fn codeowners_detection_ignores_inline_comments_and_invalid_owner_lines() {
+    let repo = temp_dir("codeowners-comments-invalid");
+    fs::write(
+        repo.join("CODEOWNERS"),
+        "/apps/* @platform # app owners\n/apps/github reviewer\n/web/* @org/web-team extra-owner\n/docs/* docs@example.com # docs owners\n/internal\n",
+    )
+    .expect("write root");
+
+    let loaded = io::codeowners::load(&repo);
+
+    assert!(loaded.found);
+    assert_eq!(loaded.rules.len(), 3);
+    assert_eq!(loaded.rules[0].pattern, "/apps/*");
+    assert_eq!(loaded.rules[0].owners, vec![String::from("@platform")]);
+    assert_eq!(loaded.rules[1].pattern, "/docs/*");
+    assert_eq!(
+        loaded.rules[1].owners,
+        vec![String::from("docs@example.com")]
+    );
+    assert_eq!(loaded.rules[2].pattern, "/internal");
+    assert!(loaded.rules[2].owners.is_empty());
+}
+
+#[test]
 fn git_remote_parser_normalizes_github_origin() {
     let parsed =
         adapter::git::parse_github_remote_for_tests("git@github.com:example/review-firewall.git")

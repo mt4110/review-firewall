@@ -49,7 +49,11 @@ fn codeowners_locations(repo_root: &Path) -> [std::path::PathBuf; 3] {
 }
 
 fn parse_rule(line: &str) -> Option<CodeownerRule> {
-    let trimmed = line.trim();
+    let trimmed = line
+        .split_once('#')
+        .map(|(rule, _)| rule)
+        .unwrap_or(line)
+        .trim();
     if trimmed.is_empty() || trimmed.starts_with('#') {
         return None;
     }
@@ -57,11 +61,48 @@ fn parse_rule(line: &str) -> Option<CodeownerRule> {
     if tokens.is_empty() {
         return None;
     }
+    let owners = tokens[1..]
+        .iter()
+        .map(|value| (*value).to_owned())
+        .collect::<Vec<_>>();
+    if !owners.iter().all(|owner| is_valid_owner(owner)) {
+        return None;
+    }
     Some(CodeownerRule {
         pattern: normalize_path(tokens[0]),
-        owners: tokens[1..]
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
+        owners,
     })
+}
+
+fn is_valid_owner(owner: &str) -> bool {
+    if let Some(account) = owner.strip_prefix('@') {
+        return is_valid_account_owner(account);
+    }
+    is_valid_email_owner(owner)
+}
+
+fn is_valid_account_owner(account: &str) -> bool {
+    let parts = account.split('/').collect::<Vec<_>>();
+    !parts.is_empty()
+        && parts.len() <= 2
+        && parts.iter().all(|part| {
+            !part.is_empty()
+                && part
+                    .as_bytes()
+                    .iter()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        })
+}
+
+fn is_valid_email_owner(owner: &str) -> bool {
+    let Some((local, domain)) = owner.split_once('@') else {
+        return false;
+    };
+    !local.is_empty()
+        && domain.contains('.')
+        && !domain.starts_with('.')
+        && !domain.ends_with('.')
+        && owner.as_bytes().iter().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'%' | b'+' | b'-' | b'@')
+        })
 }
