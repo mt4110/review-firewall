@@ -159,7 +159,7 @@ fn unique_participants(comments: &[CommentRecord]) -> Vec<String> {
 
 fn count_roundtrips(comments: &[CommentRecord], pr_author: Option<&str>) -> usize {
     let Some(pr_author) = pr_author.map(str::trim).filter(|author| !author.is_empty()) else {
-        return count_author_changes(comments);
+        return 0;
     };
 
     let mut previous = None::<CommentSide>;
@@ -194,25 +194,6 @@ fn comment_side(author: &str, pr_author: &str) -> Option<CommentSide> {
     } else {
         Some(CommentSide::Reviewer)
     }
-}
-
-fn count_author_changes(comments: &[CommentRecord]) -> usize {
-    let mut previous = String::new();
-    let mut roundtrips = 0;
-    for comment in comments {
-        if comment.author.is_empty() {
-            continue;
-        }
-        if previous.is_empty() {
-            previous = comment.author.clone();
-            continue;
-        }
-        if previous != comment.author {
-            roundtrips += 1;
-            previous = comment.author.clone();
-        }
-    }
-    roundtrips
 }
 
 #[cfg(test)]
@@ -260,7 +241,7 @@ mod tests {
         let threads = build_review_threads(&comments);
         assert_eq!(threads.len(), 1);
         assert_eq!(threads[0].root_comment_id, "1");
-        assert_eq!(threads[0].roundtrips, 1);
+        assert_eq!(threads[0].roundtrips, 0);
     }
 
     #[test]
@@ -323,6 +304,20 @@ mod tests {
     }
 
     #[test]
+    fn does_not_infer_roundtrips_without_pr_author() {
+        let comments = vec![
+            review_comment("1", "reviewer-a", None, "2026-03-28T00:00:00Z"),
+            review_comment("2", "reviewer-b", Some("1"), "2026-03-28T00:00:01Z"),
+            review_comment("3", "reviewer-c", Some("1"), "2026-03-28T00:00:02Z"),
+        ];
+
+        let threads = build_review_threads(&comments);
+
+        assert_eq!(threads.len(), 1);
+        assert_eq!(threads[0].roundtrips, 0);
+    }
+
+    #[test]
     fn folds_issue_comments_into_a_pseudo_thread() {
         let issue_comments = vec![
             CommentRecord {
@@ -355,7 +350,7 @@ mod tests {
 
         assert_eq!(threads.len(), 1);
         assert_eq!(threads[0].thread_id, "issue:10");
-        assert_eq!(threads[0].roundtrips, 1);
+        assert_eq!(threads[0].roundtrips, 0);
         assert_eq!(threads[0].participants, vec!["reviewer", "author"]);
     }
 
