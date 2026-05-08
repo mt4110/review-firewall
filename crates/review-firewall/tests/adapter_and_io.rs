@@ -217,3 +217,12 @@ fn scan_changed_files_supplements_pr_file_list_with_local_diff() {
         ]
     );
 }
+
+#[test]
+fn report_action_count_includes_more_than_four_actions() {
+    let count = command::report::count_author_actions_for_tests(
+        "## Author action list\n1. First\n2. Second\n3. Third\n4. Fourth\n5. Fifth\n10. Tenth\n",
+    );
+
+    assert_eq!(count, 6);
+}

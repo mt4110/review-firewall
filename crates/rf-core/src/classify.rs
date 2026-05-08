@@ -97,7 +97,7 @@ fn classify_comment(
     let concern = extract_concern(&comment.body);
     let failure_mode = extract_failure_mode(&comment.body);
     let evidence = extract_evidence(comment, scan);
-    let present_pr_impact = extract_present_pr_impact(comment, scan, failure_mode.as_deref());
+    let present_pr_impact = extract_present_pr_impact(comment, failure_mode.as_deref());
     let preference_only = is_preference_only(&comment.body, concern);
     let author_comment = is_pr_author_comment(comment, scan);
     let ownership = build_ownership_advisory(
@@ -618,11 +618,7 @@ fn extract_evidence(comment: &CommentRecord, scan: &ScanArtifact) -> Vec<String>
     dedupe_strings(evidence)
 }
 
-fn extract_present_pr_impact(
-    comment: &CommentRecord,
-    scan: &ScanArtifact,
-    failure_mode: Option<&str>,
-) -> bool {
+fn extract_present_pr_impact(comment: &CommentRecord, failure_mode: Option<&str>) -> bool {
     let lower = normalize_body(&comment.body);
     let scope_marker = contains_any(
         &lower,
@@ -641,18 +637,7 @@ fn extract_present_pr_impact(
             "here",
         ],
     );
-    let path_changed = comment
-        .path
-        .as_ref()
-        .map(|path| scan.changed_files.iter().any(|changed| changed == path))
-        .unwrap_or(false);
-    let references_changed_file = scan.changed_files.iter().any(|path| {
-        let basename = path.rsplit('/').next().unwrap_or(path);
-        let stem = basename.split('.').next().unwrap_or(basename);
-        !stem.is_empty() && lower.contains(&stem.to_ascii_lowercase())
-    });
-
-    scope_marker && (path_changed || references_changed_file || failure_mode.is_some())
+    scope_marker && failure_mode.is_some()
 }
 
 fn is_preference_only(body: &str, concern: Option<BlockerConcern>) -> bool {

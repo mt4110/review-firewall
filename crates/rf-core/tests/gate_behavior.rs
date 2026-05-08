@@ -73,6 +73,25 @@ fn changed_path_alone_is_not_present_pr_impact() {
 }
 
 #[test]
+fn scoped_changed_path_without_failure_mode_is_not_present_pr_impact() {
+    let scan = base_scan("This security concern is here in this PR.");
+    let config = GateConfigSnapshot {
+        require_failure_mode: false,
+        require_evidence: false,
+        ..GateConfigSnapshot::default()
+    };
+
+    let gate = gate_scan(&scan, &config, &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert!(!comment.present_pr_impact);
+    assert!(gate.residual_blockers.is_empty());
+}
+
+#[test]
 fn config_can_disable_evidence_requirement() {
     let scan = base_scan(
         "This can break the response contract in this PR and should be fixed before merge.",

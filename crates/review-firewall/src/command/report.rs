@@ -36,15 +36,7 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
     );
     artifacts::write_text(run.directory.join("report.md"), &markdown).map_err(io_error)?;
 
-    let action_count = markdown
-        .lines()
-        .filter(|line| {
-            line.starts_with("1.")
-                || line.starts_with("2.")
-                || line.starts_with("3.")
-                || line.starts_with("4.")
-        })
-        .count();
+    let action_count = count_author_actions(&markdown);
 
     Ok(CommandOutcome {
         status,
@@ -61,6 +53,26 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
         ],
         next: None,
     })
+}
+
+fn count_author_actions(markdown: &str) -> usize {
+    markdown
+        .lines()
+        .filter(|line| is_numbered_action(line.trim()))
+        .count()
+}
+
+fn is_numbered_action(line: &str) -> bool {
+    let Some((number, rest)) = line.split_once('.') else {
+        return false;
+    };
+    !number.is_empty() && number.as_bytes().iter().all(u8::is_ascii_digit) && rest.starts_with(' ')
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn count_author_actions_for_tests(markdown: &str) -> usize {
+    count_author_actions(markdown)
 }
 
 fn report_status_and_reason(

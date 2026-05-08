@@ -29,8 +29,16 @@ pub fn create_new(repo_root: &Path) -> io::Result<RunDirectory> {
 }
 
 fn create_unique_run_directory(run_root: &Path) -> io::Result<(String, PathBuf)> {
-    for _ in 0..5 {
-        let timestamp = current_timestamp()?;
+    let base_timestamp = current_timestamp()?;
+    create_unique_run_directory_with_base(run_root, &base_timestamp)
+}
+
+fn create_unique_run_directory_with_base(
+    run_root: &Path,
+    base_timestamp: &str,
+) -> io::Result<(String, PathBuf)> {
+    for attempt in 0..5 {
+        let timestamp = timestamp_candidate(base_timestamp, attempt);
         let directory = run_root.join(&timestamp);
         match fs::create_dir(&directory) {
             Ok(()) => return Ok((timestamp, directory)),
@@ -42,6 +50,14 @@ fn create_unique_run_directory(run_root: &Path) -> io::Result<(String, PathBuf)>
         io::ErrorKind::AlreadyExists,
         "could not allocate a unique run timestamp",
     ))
+}
+
+fn timestamp_candidate(base_timestamp: &str, attempt: usize) -> String {
+    if attempt == 0 {
+        base_timestamp.to_owned()
+    } else {
+        format!("{base_timestamp}-{attempt:02}")
+    }
 }
 
 pub fn latest_or_create(repo_root: &Path) -> io::Result<RunDirectory> {
@@ -87,6 +103,15 @@ fn current_timestamp() -> io::Result<String> {
 }
 
 fn is_safe_run_timestamp(value: &str) -> bool {
+    let Some((base, suffix)) = value.split_once('-') else {
+        return is_safe_run_timestamp_base(value);
+    };
+    is_safe_run_timestamp_base(base)
+        && suffix.len() == 2
+        && suffix.as_bytes().iter().all(u8::is_ascii_digit)
+}
+
+fn is_safe_run_timestamp_base(value: &str) -> bool {
     match value.len() {
         16 => {
             has_digits(value, 0..8)
@@ -118,7 +143,7 @@ mod tests {
     use std::env;
     use std::fs;
 
-    use super::{create_new, load_latest};
+    use super::{create_new, create_unique_run_directory_with_base, load_latest};
 
     #[test]
     fn latest_pointer_uses_json() {
@@ -159,6 +184,26 @@ mod tests {
     }
 
     #[test]
+    fn timestamp_collision_uses_safe_suffix_without_sleeping() {
+        let root = env::temp_dir().join(format!(
+            "review-firewall-run-store-collision-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("unix time")
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).expect("temp dir");
+        let base = "20260328T203500.123456789Z";
+        fs::create_dir(root.join(base)).expect("base collision");
+
+        let (timestamp, directory) =
+            create_unique_run_directory_with_base(&root, base).expect("unique directory");
+
+        assert_eq!(timestamp, "20260328T203500.123456789Z-01");
+        assert_eq!(directory, root.join("20260328T203500.123456789Z-01"));
+    }
+
+    #[test]
     fn latest_pointer_rejects_path_traversal() {
         let root = env::temp_dir().join(format!(
             "review-firewall-run-store-traversal-{}",
@@ -178,6 +223,34 @@ mod tests {
         let error = load_latest(&root).expect_err("unsafe latest should error");
 
         assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn latest_pointer_accepts_safe_suffix_timestamp() {
+        let root = env::temp_dir().join(format!(
+            "review-firewall-run-store-suffix-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("unix time")
+                .as_nanos()
+        ));
+        let run_root = root.join(".review-firewall").join("run");
+        fs::create_dir_all(&run_root).expect("run dir");
+        fs::write(
+            run_root.join("latest.json"),
+            "{\n  \"timestamp\": \"20260328T203500.123456789Z-01\"\n}\n",
+        )
+        .expect("write latest");
+
+        let loaded = load_latest(&root)
+            .expect("load latest")
+            .expect("latest pointer");
+
+        assert_eq!(loaded.timestamp, "20260328T203500.123456789Z-01");
+        assert_eq!(
+            loaded.directory,
+            run_root.join("20260328T203500.123456789Z-01")
+        );
     }
 
     #[test]

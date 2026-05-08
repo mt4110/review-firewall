@@ -28,6 +28,12 @@ Use UTC compact form with nanosecond precision:
 YYYYMMDDTHHMMSS.NNNNNNNNNZ
 ```
 
+When a run directory collides on a coarse clock, append a two-digit numeric suffix:
+
+```text
+YYYYMMDDTHHMMSS.NNNNNNNNNZ-01
+```
+
 Example:
 
 ```text

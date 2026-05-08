@@ -221,6 +221,7 @@ Compute:
 - aggregate counts
 
 The PR author's own comments may still be classified for context, but they are not extracted as residual blockers.
+Diff-local context by itself is never enough for `present_pr_impact=true`; the comment must include a concrete failure mode.
 
 Output:
 
@@ -306,6 +307,7 @@ Why `latest.json` instead of symlink:
 - easier deterministic tests
 
 Run directory timestamps include nanosecond precision so repeated `scan` executions do not reuse the same directory.
+If a timestamp collision still occurs on a coarse clock, the run directory gets a numeric suffix such as `-01` instead of sleeping.
 When `latest.json` is read back, the timestamp must match a generated run-directory name before it is joined to the run root.
 
 ## Testing strategy
