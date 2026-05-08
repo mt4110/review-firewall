@@ -1,7 +1,8 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rf_core::build_report_markdown;
 use rf_core::domain::{DraftReplyArtifact, GateArtifact, ScanArtifact, Status};
+use serde::de::DeserializeOwned;
 
 use crate::adapter::git;
 use crate::command::CommandOutcome;
@@ -11,28 +12,55 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
     let repo_root = git::repo_root(cwd);
     let run = run_store::latest_or_create(&repo_root.path).map_err(io_error)?;
 
-    let scan =
-        artifacts::read_json::<ScanArtifact>(run.directory.join("scan.json")).map_err(io_error)?;
-    let gate =
-        artifacts::read_json::<GateArtifact>(run.directory.join("gate.json")).map_err(io_error)?;
-    let draft = artifacts::read_json::<DraftReplyArtifact>(run.directory.join("draft_reply.json"))
-        .map_err(io_error)?;
-    let escalation = artifacts::read_text(run.directory.join("escalation.md")).map_err(io_error)?;
+    let scan = read_json_artifact::<ScanArtifact>(
+        run.directory.join("scan.json"),
+        "scan.json",
+        Status::Error,
+        "scan.json not found; run review-firewall scan first",
+    );
+    let gate = read_json_artifact::<GateArtifact>(
+        run.directory.join("gate.json"),
+        "gate.json",
+        Status::Partial,
+        "gate.json not found; run review-firewall gate first",
+    );
+    let draft = read_json_artifact::<DraftReplyArtifact>(
+        run.directory.join("draft_reply.json"),
+        "draft_reply.json",
+        Status::Partial,
+        "draft_reply.json not found; run review-firewall draft-reply first",
+    );
+    let escalation = read_text_artifact(
+        run.directory.join("escalation.md"),
+        "escalation.md",
+        Status::Partial,
+        "escalation.md not found; run review-firewall escalate first",
+    );
+    let input_problems = [
+        scan.problem.clone(),
+        gate.problem.clone(),
+        draft.problem.clone(),
+        escalation.problem.clone(),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>();
 
     let (status, reason) = report_status_and_reason(
-        scan.as_ref(),
-        gate.as_ref(),
-        draft.as_ref(),
-        escalation.as_deref(),
+        scan.value.as_ref(),
+        gate.value.as_ref(),
+        draft.value.as_ref(),
+        escalation.value.as_deref(),
+        &input_problems,
     );
 
     let markdown = build_report_markdown(
         status,
         reason.as_deref(),
-        scan.as_ref(),
-        gate.as_ref(),
-        draft.as_ref(),
-        escalation.as_deref(),
+        scan.value.as_ref(),
+        gate.value.as_ref(),
+        draft.value.as_ref(),
+        escalation.value.as_deref(),
     );
     artifacts::write_text(run.directory.join("report.md"), &markdown).map_err(io_error)?;
 
@@ -44,7 +72,8 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
         lines: vec![
             format!(
                 "Residual blockers: {}",
-                gate.as_ref()
+                gate.value
+                    .as_ref()
                     .map(|artifact| artifact.residual_blockers.len())
                     .unwrap_or(0)
             ),
@@ -53,6 +82,73 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
         ],
         next: None,
     })
+}
+
+#[derive(Debug, Clone)]
+struct ArtifactProblem {
+    status: Status,
+    reason: String,
+}
+
+struct ArtifactRead<T> {
+    value: Option<T>,
+    problem: Option<ArtifactProblem>,
+}
+
+fn read_json_artifact<T: DeserializeOwned>(
+    path: PathBuf,
+    label: &str,
+    missing_status: Status,
+    missing_reason: &str,
+) -> ArtifactRead<T> {
+    match artifacts::read_json::<T>(path) {
+        Ok(value @ Some(_)) => ArtifactRead {
+            value,
+            problem: None,
+        },
+        Ok(None) => ArtifactRead {
+            value: None,
+            problem: Some(ArtifactProblem {
+                status: missing_status,
+                reason: missing_reason.to_owned(),
+            }),
+        },
+        Err(error) => ArtifactRead {
+            value: None,
+            problem: Some(ArtifactProblem {
+                status: Status::Error,
+                reason: format!("{label} could not be read: {error}"),
+            }),
+        },
+    }
+}
+
+fn read_text_artifact(
+    path: PathBuf,
+    label: &str,
+    missing_status: Status,
+    missing_reason: &str,
+) -> ArtifactRead<String> {
+    match artifacts::read_text(path) {
+        Ok(value @ Some(_)) => ArtifactRead {
+            value,
+            problem: None,
+        },
+        Ok(None) => ArtifactRead {
+            value: None,
+            problem: Some(ArtifactProblem {
+                status: missing_status,
+                reason: missing_reason.to_owned(),
+            }),
+        },
+        Err(error) => ArtifactRead {
+            value: None,
+            problem: Some(ArtifactProblem {
+                status: Status::Error,
+                reason: format!("{label} could not be read: {error}"),
+            }),
+        },
+    }
 }
 
 fn count_author_actions(markdown: &str) -> usize {
@@ -80,23 +176,8 @@ fn report_status_and_reason(
     gate: Option<&GateArtifact>,
     draft: Option<&DraftReplyArtifact>,
     escalation: Option<&str>,
+    input_problems: &[ArtifactProblem],
 ) -> (Status, Option<String>) {
-    let Some(scan) = scan else {
-        return (
-            Status::Error,
-            Some(String::from(
-                "scan.json not found; run review-firewall scan first",
-            )),
-        );
-    };
-
-    if gate.is_none() || draft.is_none() || escalation.is_none() {
-        return (
-            scan.status.merge(Status::Partial),
-            Some(String::from("One or more upstream artifacts are missing")),
-        );
-    }
-
     let escalation_status = escalation
         .and_then(markdown_status)
         .unwrap_or(Status::Partial);
@@ -107,21 +188,41 @@ fn report_status_and_reason(
             None
         }
     });
-    let gate = gate.expect("checked gate");
-    let draft = draft.expect("checked draft");
-    let status = scan
-        .status
-        .merge(gate.status)
-        .merge(draft.status)
-        .merge(escalation_status);
+    let mut status = scan
+        .map(|artifact| artifact.status)
+        .unwrap_or(Status::Error);
+    if let Some(gate) = gate {
+        status = status.merge(gate.status);
+    }
+    if let Some(draft) = draft {
+        status = status.merge(draft.status);
+    }
+    if escalation.is_some() {
+        status = status.merge(escalation_status);
+    }
+    for problem in input_problems {
+        status = status.merge(problem.status);
+    }
+
     let reason = gate
-        .reason
-        .clone()
-        .or_else(|| draft.reason.clone())
+        .and_then(|artifact| artifact.reason.clone())
+        .or_else(|| draft.and_then(|artifact| artifact.reason.clone()))
         .or_else(|| escalation_reason.clone())
-        .or_else(|| scan.reason.clone());
+        .or_else(|| scan.and_then(|artifact| artifact.reason.clone()))
+        .or_else(|| input_problems.first().map(|problem| problem.reason.clone()));
 
     (status, reason)
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn report_status_and_reason_for_tests(
+    scan: Option<&ScanArtifact>,
+    gate: Option<&GateArtifact>,
+    draft: Option<&DraftReplyArtifact>,
+    escalation: Option<&str>,
+) -> (Status, Option<String>) {
+    report_status_and_reason(scan, gate, draft, escalation, &[])
 }
 
 fn markdown_status(markdown: &str) -> Option<Status> {

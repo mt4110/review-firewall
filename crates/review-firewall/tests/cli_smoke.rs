@@ -214,6 +214,21 @@ fn joined_path(extra_path: &Path) -> OsString {
     env::join_paths(paths).expect("join PATH")
 }
 
+fn latest_run_dir(repo: &Path) -> PathBuf {
+    let latest = fs::read_to_string(
+        repo.join(".review-firewall")
+            .join("run")
+            .join("latest.json"),
+    )
+    .expect("latest pointer");
+    let latest: serde_json::Value = serde_json::from_str(&latest).expect("latest json");
+    let timestamp = latest
+        .get("timestamp")
+        .and_then(serde_json::Value::as_str)
+        .expect("timestamp");
+    repo.join(".review-firewall").join("run").join(timestamp)
+}
+
 #[test]
 fn smoke_flow_creates_all_artifacts() {
     let repo = temp_dir("smoke-ok");
@@ -266,6 +281,85 @@ fn smoke_flow_creates_all_artifacts() {
     assert!(gate.contains(r#""status": "OK""#));
     assert!(gate.contains(r#""residual_blockers""#));
     assert!(escalation.contains("# RFC Candidate"));
+}
+
+#[test]
+fn report_preserves_error_status_when_upstream_artifact_is_missing() {
+    let repo = temp_dir("report-preserve-error");
+    init_repo(&repo);
+    let gh_stub = install_gh_success_stub(&repo);
+
+    for args in [vec!["scan", "--pr", "42"], vec!["gate"]] {
+        let output = run_with_path(&repo, &gh_stub, &args);
+        assert!(
+            output.status.success(),
+            "command failed: {:?}\nstdout={}\nstderr={}",
+            args,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let run_dir = latest_run_dir(&repo);
+    let gate_path = run_dir.join("gate.json");
+    let mut gate: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&gate_path).expect("gate")).expect("gate json");
+    gate["status"] = serde_json::Value::String(String::from("ERROR"));
+    gate["reason"] = serde_json::Value::String(String::from("gate failed"));
+    fs::write(
+        &gate_path,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&gate).expect("render gate")
+        ),
+    )
+    .expect("write gate");
+
+    let report = run_with_path(&repo, &gh_stub, &["report"]);
+
+    assert!(report.status.success());
+    let stdout = String::from_utf8_lossy(&report.stdout);
+    assert!(stdout.contains("STATUS: ERROR"));
+    assert!(stdout.contains("REASON: gate failed"));
+    let report_md = fs::read_to_string(run_dir.join("report.md")).expect("report");
+    assert!(report_md.contains("STATUS: ERROR"));
+    assert!(report_md.contains("REASON: gate failed"));
+}
+
+#[test]
+fn report_writes_error_artifact_for_unreadable_upstream_artifact() {
+    let repo = temp_dir("report-corrupt-upstream");
+    init_repo(&repo);
+    let gh_stub = install_gh_success_stub(&repo);
+
+    for args in [
+        vec!["scan", "--pr", "42"],
+        vec!["gate"],
+        vec!["draft-reply"],
+        vec!["escalate"],
+    ] {
+        let output = run_with_path(&repo, &gh_stub, &args);
+        assert!(
+            output.status.success(),
+            "command failed: {:?}\nstdout={}\nstderr={}",
+            args,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let run_dir = latest_run_dir(&repo);
+    fs::write(run_dir.join("draft_reply.json"), "{ not json\n").expect("corrupt draft");
+
+    let report = run_with_path(&repo, &gh_stub, &["report"]);
+
+    assert!(report.status.success());
+    let stdout = String::from_utf8_lossy(&report.stdout);
+    assert!(stdout.contains("STATUS: ERROR"));
+    assert!(stdout.contains("draft_reply.json could not be read"));
+    let report_md = fs::read_to_string(run_dir.join("report.md")).expect("report");
+    assert!(report_md.contains("STATUS: ERROR"));
+    assert!(report_md.contains("draft_reply.json could not be read"));
 }
 
 #[test]
