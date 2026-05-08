@@ -206,9 +206,39 @@ fn git_changed_files_prefers_worktree_status_over_previous_commit() {
 }
 
 #[test]
+fn git_changed_files_falls_through_to_previous_commit_when_status_is_empty() {
+    let repo = temp_dir("changed-files-clean");
+    run_git(&repo, &["init", "--initial-branch=main"]);
+    run_git(&repo, &["config", "user.email", "review-bot@example.com"]);
+    run_git(&repo, &["config", "user.name", "Review Bot"]);
+    fs::write(repo.join("first.rs"), "first\n").expect("write first");
+    run_git(&repo, &["add", "first.rs"]);
+    run_git(&repo, &["commit", "-m", "first"]);
+    fs::write(repo.join("second.rs"), "second\n").expect("write second");
+    run_git(&repo, &["add", "second.rs"]);
+    run_git(&repo, &["commit", "-m", "second"]);
+
+    let changed = adapter::git::changed_files(&repo, None);
+
+    assert_eq!(changed.paths, vec![String::from("second.rs")]);
+    assert!(changed.reason.is_none());
+}
+
+#[test]
 fn git_remote_parser_uses_any_configured_github_remote() {
     let parsed = adapter::git::parse_repository_identity_from_remotes_for_tests(
         "upstream\tgit@github.com:example/review-firewall.git (fetch)\nupstream\tgit@github.com:example/review-firewall.git (push)\n",
+    )
+    .expect("parsed remote");
+
+    assert_eq!(parsed.host, "github.com");
+    assert_eq!(parsed.full_name, "example/review-firewall");
+}
+
+#[test]
+fn git_remote_parser_prefers_origin_fetch() {
+    let parsed = adapter::git::parse_repository_identity_from_remotes_for_tests(
+        "mirror\tgit@github.com:example/mirror.git (fetch)\nmirror\tgit@github.com:example/mirror.git (push)\norigin\tgit@github.com:example/review-firewall.git (fetch)\norigin\tgit@github.com:example/review-firewall.git (push)\n",
     )
     .expect("parsed remote");
 

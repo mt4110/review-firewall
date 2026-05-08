@@ -154,7 +154,7 @@ pub fn changed_files(repo_root: &Path, base_branch: Option<&str>) -> PathsProbe 
         } else {
             parse_changed_paths(&output.stdout)
         };
-        if !paths.is_empty() || attempt.first().map(String::as_str) == Some("status") {
+        if !paths.is_empty() {
             return PathsProbe {
                 paths,
                 reason: None,
@@ -189,11 +189,46 @@ fn parse_github_remote(remote: &str) -> Option<RepositoryIdentity> {
 }
 
 fn parse_repository_identity_from_remotes(output: &str) -> Option<RepositoryIdentity> {
-    output.lines().find_map(|line| {
-        let mut parts = line.split_whitespace();
-        let _name = parts.next()?;
-        let url = parts.next()?;
-        parse_github_remote(url)
+    let remotes = output
+        .lines()
+        .filter_map(parse_remote_listing)
+        .collect::<Vec<_>>();
+    remotes
+        .iter()
+        .find(|remote| remote.name == "origin" && remote.direction == "(fetch)")
+        .and_then(|remote| parse_github_remote(remote.url))
+        .or_else(|| {
+            remotes
+                .iter()
+                .find(|remote| remote.name == "origin")
+                .and_then(|remote| parse_github_remote(remote.url))
+        })
+        .or_else(|| {
+            remotes
+                .iter()
+                .find(|remote| remote.direction == "(fetch)")
+                .and_then(|remote| parse_github_remote(remote.url))
+        })
+        .or_else(|| {
+            remotes
+                .iter()
+                .find_map(|remote| parse_github_remote(remote.url))
+        })
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RemoteListing<'a> {
+    name: &'a str,
+    url: &'a str,
+    direction: &'a str,
+}
+
+fn parse_remote_listing(line: &str) -> Option<RemoteListing<'_>> {
+    let mut parts = line.split_whitespace();
+    Some(RemoteListing {
+        name: parts.next()?,
+        url: parts.next()?,
+        direction: parts.next().unwrap_or(""),
     })
 }
 
