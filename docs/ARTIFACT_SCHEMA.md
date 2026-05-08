@@ -22,16 +22,16 @@ If a field is added, it must be backward compatible or versioned.
 
 ## Timestamp format
 
-Use UTC compact form:
+Use UTC compact form with nanosecond precision:
 
 ```text
-YYYYMMDDTHHMMSSZ
+YYYYMMDDTHHMMSS.NNNNNNNNNZ
 ```
 
 Example:
 
 ```text
-20260328T203500Z
+20260328T203500.123456789Z
 ```
 
 ## Common fields

@@ -44,6 +44,25 @@ fn config_loads_known_keys_and_ignores_unknown_ones() {
 }
 
 #[test]
+fn config_marks_invalid_known_values_as_partial() {
+    let repo = temp_dir("config-invalid");
+    fs::write(
+        repo.join("review-firewall.toml"),
+        "version = 1\n[blocker]\nrequire_evidence = flase\n",
+    )
+    .expect("write config");
+
+    let loaded = io::config::load(&repo);
+
+    assert!(loaded.found);
+    assert_eq!(loaded.status.terminal_label(), "PARTIAL");
+    assert_eq!(
+        loaded.reason.as_deref(),
+        Some("Invalid config value for blocker.require_evidence: flase")
+    );
+}
+
+#[test]
 fn codeowners_detection_reads_rules() {
     let repo = temp_dir("codeowners");
     fs::create_dir_all(repo.join(".github")).expect("codeowners dir");
@@ -135,4 +154,21 @@ fn scan_normalization_drops_empty_review_decisions() {
     let pr = command::scan::build_pull_request_summary_for_tests(&pr_value);
 
     assert!(pr.review_decisions.is_empty());
+}
+
+#[test]
+fn scan_changed_files_supplements_pr_file_list_with_local_diff() {
+    let merged = command::scan::merge_changed_files_for_tests(
+        vec![String::from("src/a.rs"), String::from("src/b.rs")],
+        &[String::from("src/b.rs"), String::from("src/c.rs")],
+    );
+
+    assert_eq!(
+        merged,
+        vec![
+            String::from("src/a.rs"),
+            String::from("src/b.rs"),
+            String::from("src/c.rs")
+        ]
+    );
 }

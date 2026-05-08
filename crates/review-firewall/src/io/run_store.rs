@@ -1,7 +1,6 @@
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 use rf_core::domain::LatestPointer;
 use time::OffsetDateTime;
@@ -35,9 +34,7 @@ fn create_unique_run_directory(run_root: &Path) -> io::Result<(String, PathBuf)>
         let directory = run_root.join(&timestamp);
         match fs::create_dir(&directory) {
             Ok(()) => return Ok((timestamp, directory)),
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-                std::thread::sleep(Duration::from_secs(1));
-            }
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
             Err(error) => return Err(error),
         }
     }
@@ -78,7 +75,7 @@ pub fn write_latest(run: &RunDirectory) -> io::Result<()> {
 fn current_timestamp() -> io::Result<String> {
     OffsetDateTime::now_utc()
         .format(format_description!(
-            "[year][month][day]T[hour][minute][second]Z"
+            "[year][month][day]T[hour][minute][second].[subsecond digits:9]Z"
         ))
         .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error.to_string()))
 }

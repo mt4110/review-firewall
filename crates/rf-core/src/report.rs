@@ -45,7 +45,7 @@ pub fn build_report_markdown(
         ));
     } else {
         let escalation_count = escalation_markdown
-            .map(|markdown| markdown.matches("# ADR Candidate").count())
+            .map(count_escalation_candidates)
             .unwrap_or(0);
         lines.push(String::from(
             "Impact: no current merge blocker was extracted",
@@ -78,7 +78,7 @@ pub fn build_report_markdown(
         action_index += 1;
     }
     if escalation_markdown
-        .map(|markdown| markdown.contains("# ADR Candidate"))
+        .map(|markdown| count_escalation_candidates(markdown) > 0)
         .unwrap_or(false)
     {
         lines.push(format!(
@@ -109,6 +109,17 @@ fn concern_label(concern: &crate::domain::BlockerConcern) -> &'static str {
         crate::domain::BlockerConcern::Operability => "operability",
         crate::domain::BlockerConcern::Api => "api",
     }
+}
+
+fn count_escalation_candidates(markdown: &str) -> usize {
+    [
+        "# ADR Candidate",
+        "# RFC Candidate",
+        "# Human Judgment Candidate",
+    ]
+    .iter()
+    .map(|header| markdown.matches(header).count())
+    .sum()
 }
 
 fn reply_label(reply_type: &crate::domain::ReplyType) -> &'static str {

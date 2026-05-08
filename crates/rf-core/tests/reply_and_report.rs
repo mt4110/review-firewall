@@ -108,3 +108,18 @@ fn report_contains_required_sections() {
     assert!(report.contains("## PM summary"));
     assert!(report.contains("## Author action list"));
 }
+
+#[test]
+fn report_counts_non_adr_escalation_candidates() {
+    let report = build_report_markdown(
+        Status::Ok,
+        None,
+        None,
+        None,
+        None,
+        Some("# Escalation\n\n# RFC Candidate\n\n## Title\nAPI policy"),
+    );
+
+    assert!(report.contains("Action: move the long-running design thread to ADR/RFC"));
+    assert!(report.contains("Move the long-running design thread into ADR/RFC"));
+}

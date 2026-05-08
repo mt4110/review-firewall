@@ -53,7 +53,7 @@ pub fn build_escalation_markdown(
     }
 
     for candidate in actionable {
-        lines.push(String::from("# ADR Candidate"));
+        lines.push(candidate_header(candidate.label).to_owned());
         lines.push(String::new());
         lines.push(String::from("## Title"));
         lines.push(candidate.title.clone());
@@ -147,6 +147,15 @@ fn label_thread(thread: &ReviewThread) -> (EscalationLabel, String) {
     )
 }
 
+fn candidate_header(label: EscalationLabel) -> &'static str {
+    match label {
+        EscalationLabel::MoveToAdr => "# ADR Candidate",
+        EscalationLabel::MoveToRfc => "# RFC Candidate",
+        EscalationLabel::NeedsHumanJudgment => "# Human Judgment Candidate",
+        EscalationLabel::StayInPr => "# PR-local Candidate",
+    }
+}
+
 fn title(thread: &ReviewThread) -> String {
     let text = thread
         .comments
@@ -206,9 +215,9 @@ fn contains_any(text: &str, needles: &[&str]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::{CommentRecord, CommentSource, EscalationLabel, ReviewThread};
+    use crate::domain::{CommentRecord, CommentSource, EscalationLabel, ReviewThread, Status};
 
-    use super::evaluate_escalation_candidates;
+    use super::{build_escalation_markdown, evaluate_escalation_candidates};
 
     #[test]
     fn labels_contract_thread_for_adr() {
@@ -274,5 +283,63 @@ mod tests {
         let candidates = evaluate_escalation_candidates(&[thread], 2);
 
         assert_eq!(candidates[0].label, EscalationLabel::MoveToAdr);
+    }
+
+    #[test]
+    fn renders_rfc_candidate_header_for_cross_boundary_thread() {
+        let thread = ReviewThread {
+            thread_id: "rfc".into(),
+            root_comment_id: "rfc".into(),
+            path: Some("src/api.rs".into()),
+            participants: vec!["reviewer".into(), "author".into()],
+            roundtrips: 3,
+            comments: vec![CommentRecord {
+                comment_id: "rfc".into(),
+                thread_id: "rfc".into(),
+                author: "reviewer".into(),
+                body: "This public API affects cross-team consumers.".into(),
+                path: Some("src/api.rs".into()),
+                source: CommentSource::ReviewComment,
+                reply_to_comment_id: None,
+                created_at: None,
+                line: None,
+                original_line: None,
+            }],
+        };
+        let candidates = evaluate_escalation_candidates(&[thread], 2);
+
+        let markdown = build_escalation_markdown(Status::Ok, None, Some(42), &candidates);
+
+        assert!(markdown.contains("# RFC Candidate"));
+        assert!(!markdown.contains("# ADR Candidate"));
+    }
+
+    #[test]
+    fn renders_human_judgment_header_for_unclear_long_thread() {
+        let thread = ReviewThread {
+            thread_id: "human".into(),
+            root_comment_id: "human".into(),
+            path: Some("src/view.rs".into()),
+            participants: vec!["reviewer".into(), "author".into()],
+            roundtrips: 4,
+            comments: vec![CommentRecord {
+                comment_id: "human".into(),
+                thread_id: "human".into(),
+                author: "reviewer".into(),
+                body: "I still do not feel good about this direction.".into(),
+                path: Some("src/view.rs".into()),
+                source: CommentSource::ReviewComment,
+                reply_to_comment_id: None,
+                created_at: None,
+                line: None,
+                original_line: None,
+            }],
+        };
+        let candidates = evaluate_escalation_candidates(&[thread], 2);
+
+        let markdown = build_escalation_markdown(Status::Ok, None, Some(42), &candidates);
+
+        assert!(markdown.contains("# Human Judgment Candidate"));
+        assert!(!markdown.contains("# ADR Candidate"));
     }
 }

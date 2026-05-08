@@ -300,6 +300,8 @@ Why `latest.json` instead of symlink:
 - simpler tooling
 - easier deterministic tests
 
+Run directory timestamps include nanosecond precision so repeated `scan` executions do not reuse the same directory.
+
 ## Testing strategy
 
 ### Unit tests

@@ -138,36 +138,50 @@ fn assign_value(config: &mut ReviewFirewallConfig, section: &str, key: &str, raw
         "review.max_pr_thread_roundtrips" => {
             if let Some(value) = parse_usize(raw_value) {
                 config.review.max_pr_thread_roundtrips = value;
+            } else {
+                mark_invalid_value(config, &scoped, raw_value);
             }
         }
         "blocker.require_failure_mode" => {
             if let Some(value) = parse_bool(raw_value) {
                 config.blocker.require_failure_mode = value;
+            } else {
+                mark_invalid_value(config, &scoped, raw_value);
             }
         }
         "blocker.require_concern" => {
             if let Some(value) = parse_bool(raw_value) {
                 config.blocker.require_concern = value;
+            } else {
+                mark_invalid_value(config, &scoped, raw_value);
             }
         }
         "blocker.require_evidence" => {
             if let Some(value) = parse_bool(raw_value) {
                 config.blocker.require_evidence = value;
+            } else {
+                mark_invalid_value(config, &scoped, raw_value);
             }
         }
         "blocker.require_alternative" => {
             if let Some(value) = parse_bool(raw_value) {
                 config.blocker.require_alternative = value;
+            } else {
+                mark_invalid_value(config, &scoped, raw_value);
             }
         }
         "ownership.use_codeowners" => {
             if let Some(value) = parse_bool(raw_value) {
                 config.ownership.use_codeowners = value;
+            } else {
+                mark_invalid_value(config, &scoped, raw_value);
             }
         }
         "reply.max_lines" => {
             if let Some(value) = parse_usize(raw_value) {
                 config.reply.max_lines = value.max(1);
+            } else {
+                mark_invalid_value(config, &scoped, raw_value);
             }
         }
         _ => config.unknown_keys.push(scoped),
@@ -206,4 +220,11 @@ fn mark_partial(config: &mut ReviewFirewallConfig, reason: String) {
     if config.reason.is_none() {
         config.reason = Some(reason);
     }
+}
+
+fn mark_invalid_value(config: &mut ReviewFirewallConfig, key: &str, raw_value: &str) {
+    mark_partial(
+        config,
+        format!("Invalid config value for {key}: {raw_value}"),
+    );
 }

@@ -59,100 +59,107 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
     let mut issue_comments = Vec::<CommentRecord>::new();
     let mut review_threads = Vec::new();
 
-    if let Ok(pr_data) = pr_view {
-        pr = build_pull_request_summary(&pr_data);
-        changed_files = pr_changed_files(&pr_data);
+    match pr_view {
+        Ok(pr_data) => {
+            pr = build_pull_request_summary(&pr_data);
+            changed_files = pr_changed_files(&pr_data);
 
-        let local_changed = git::changed_files(&repo_root.path, pr.base_branch.as_deref());
-        if changed_files.is_empty() {
-            changed_files = local_changed.paths.clone();
-        }
-        merge_probe_reason(
-            &mut status,
-            &mut reason,
-            &mut warnings,
-            local_changed.reason,
-            Status::Partial,
-        );
-
-        if let (Some(pr_number), Some(repository)) = (pr.number, repository.identity.clone()) {
-            match gh::review_comments(
-                &repo_root.path,
-                &repository.full_name,
-                repository.host.as_str(),
-                pr_number,
-            ) {
-                Ok(values) => {
-                    comments = values
-                        .iter()
-                        .filter_map(review_comment_record)
-                        .map(|mut comment| {
-                            comment.path = comment.path.take().map(|value| normalize_path(&value));
-                            comment
-                        })
-                        .collect();
-                }
-                Err(error) => {
-                    partial_sources.push(String::from("review_comments"));
-                    merge_probe_reason(
-                        &mut status,
-                        &mut reason,
-                        &mut warnings,
-                        Some(error),
-                        Status::Partial,
-                    );
-                }
-            }
-
-            match gh::issue_comments(
-                &repo_root.path,
-                &repository.full_name,
-                repository.host.as_str(),
-                pr_number,
-            ) {
-                Ok(values) => {
-                    issue_comments = values.iter().filter_map(issue_comment_record).collect();
-                }
-                Err(error) => {
-                    partial_sources.push(String::from("issue_comments"));
-                    warnings.push(error);
-                    status = status.merge(Status::Partial);
-                }
-            }
-
-            review_threads = build_conversation_threads(&comments, &issue_comments);
-        } else if pr.number.is_some() && repository.identity.is_none() {
-            partial_sources.push(String::from("repository_identity"));
+            let local_changed = git::changed_files(&repo_root.path, pr.base_branch.as_deref());
+            changed_files = merge_changed_files(changed_files, &local_changed.paths);
             merge_probe_reason(
                 &mut status,
                 &mut reason,
                 &mut warnings,
-                repository.reason.clone().or_else(|| {
-                    Some(String::from(
-                        "Could not parse GitHub repository identity from origin remote",
-                    ))
-                }),
+                local_changed.reason,
                 Status::Partial,
             );
+
+            if let (Some(pr_number), Some(repository)) = (pr.number, repository.identity.clone()) {
+                match gh::review_comments(
+                    &repo_root.path,
+                    &repository.full_name,
+                    repository.host.as_str(),
+                    pr_number,
+                ) {
+                    Ok(values) => {
+                        comments = values
+                            .iter()
+                            .filter_map(review_comment_record)
+                            .map(|mut comment| {
+                                comment.path =
+                                    comment.path.take().map(|value| normalize_path(&value));
+                                comment
+                            })
+                            .collect();
+                    }
+                    Err(error) => {
+                        partial_sources.push(String::from("review_comments"));
+                        merge_probe_reason(
+                            &mut status,
+                            &mut reason,
+                            &mut warnings,
+                            Some(error),
+                            Status::Partial,
+                        );
+                    }
+                }
+
+                match gh::issue_comments(
+                    &repo_root.path,
+                    &repository.full_name,
+                    repository.host.as_str(),
+                    pr_number,
+                ) {
+                    Ok(values) => {
+                        issue_comments = values.iter().filter_map(issue_comment_record).collect();
+                    }
+                    Err(error) => {
+                        partial_sources.push(String::from("issue_comments"));
+                        merge_probe_reason(
+                            &mut status,
+                            &mut reason,
+                            &mut warnings,
+                            Some(error),
+                            Status::Partial,
+                        );
+                    }
+                }
+
+                review_threads = build_conversation_threads(&comments, &issue_comments);
+            } else if pr.number.is_some() && repository.identity.is_none() {
+                partial_sources.push(String::from("repository_identity"));
+                merge_probe_reason(
+                    &mut status,
+                    &mut reason,
+                    &mut warnings,
+                    repository.reason.clone().or_else(|| {
+                        Some(String::from(
+                            "Could not parse GitHub repository identity from origin remote",
+                        ))
+                    }),
+                    Status::Partial,
+                );
+            }
         }
-    } else {
-        merge_probe_reason(
-            &mut status,
-            &mut reason,
-            &mut warnings,
-            pr_view.err(),
-            Status::Error,
-        );
-        let local_changed = git::changed_files(&repo_root.path, None);
-        changed_files = local_changed.paths;
-        merge_probe_reason(
-            &mut status,
-            &mut reason,
-            &mut warnings,
-            local_changed.reason,
-            Status::Partial,
-        );
-        partial_sources.push(String::from("gh_pr_view"));
+        Err(error) => {
+            merge_probe_reason(
+                &mut status,
+                &mut reason,
+                &mut warnings,
+                Some(error),
+                Status::Error,
+            );
+            let local_changed = git::changed_files(&repo_root.path, None);
+            changed_files = local_changed.paths;
+            merge_probe_reason(
+                &mut status,
+                &mut reason,
+                &mut warnings,
+                local_changed.reason,
+                Status::Partial,
+            );
+            partial_sources.push(String::from("gh_pr_view"));
+        }
     }
 
     changed_files = changed_files
@@ -289,6 +296,21 @@ fn pr_changed_files(value: &Value) -> Vec<String> {
         .filter_map(|file| file.get("path").and_then(Value::as_str))
         .map(normalize_path)
         .collect()
+}
+
+fn merge_changed_files(mut primary: Vec<String>, supplemental: &[String]) -> Vec<String> {
+    for path in supplemental {
+        if !primary.iter().any(|existing| existing == path) {
+            primary.push(path.clone());
+        }
+    }
+    primary
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn merge_changed_files_for_tests(primary: Vec<String>, supplemental: &[String]) -> Vec<String> {
+    merge_changed_files(primary, supplemental)
 }
 
 fn review_comment_record(value: &Value) -> Option<CommentRecord> {
