@@ -538,9 +538,10 @@ fn has_runtime_risk_context(text: &str) -> bool {
 
 fn extract_failure_mode(body: &str) -> Option<String> {
     split_sentences(body).into_iter().find(|sentence| {
-        normalize_body(sentence).starts_with("mode:")
+        let normalized = normalize_body(sentence);
+        normalized.starts_with("mode:")
             || contains_any(
-                sentence,
+                &normalized,
                 &[
                     "break",
                     "broken",
@@ -584,8 +585,9 @@ fn extract_evidence(comment: &CommentRecord, scan: &ScanArtifact) -> Vec<String>
     }
 
     for sentence in split_sentences(&comment.body) {
+        let normalized = normalize_body(&sentence);
         if contains_any(
-            &sentence,
+            &normalized,
             &[
                 "because",
                 "for example",

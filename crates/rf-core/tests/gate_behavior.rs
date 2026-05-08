@@ -73,6 +73,27 @@ fn changed_path_alone_is_not_present_pr_impact() {
 }
 
 #[test]
+fn failure_mode_and_evidence_detection_is_case_insensitive() {
+    let scan =
+        base_scan("This PR can Break consumers Because response contract changes in this PR.");
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let blocker = gate.residual_blockers.first().expect("residual blocker");
+    assert!(
+        blocker.failure_mode.contains("Break consumers"),
+        "failure mode should preserve original reviewer text"
+    );
+    assert!(
+        blocker
+            .evidence
+            .iter()
+            .any(|value| value.contains("Because response contract")),
+        "evidence should preserve original reviewer text"
+    );
+}
+
+#[test]
 fn scoped_changed_path_without_failure_mode_is_not_present_pr_impact() {
     let scan = base_scan("This security concern is here in this PR.");
     let config = GateConfigSnapshot {
