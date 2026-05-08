@@ -628,7 +628,7 @@ fn extract_present_pr_impact(
     evidence_present: bool,
 ) -> bool {
     let lower = normalize_body(&comment.body);
-    let scope_marker = contains_any(
+    let scope_marker = contains_scope_marker(
         &lower,
         &[
             "this pr",
@@ -649,6 +649,30 @@ fn extract_present_pr_impact(
         return false;
     }
     failure_mode.is_some() || (!require_failure_mode && concern.is_some() && evidence_present)
+}
+
+fn contains_scope_marker(text: &str, markers: &[&str]) -> bool {
+    markers.iter().any(|marker| {
+        if marker.is_ascii() {
+            contains_ascii_marker(text, marker)
+        } else {
+            text.contains(marker)
+        }
+    })
+}
+
+fn contains_ascii_marker(text: &str, marker: &str) -> bool {
+    text.match_indices(marker).any(|(index, _)| {
+        let bytes = text.as_bytes();
+        let before = index == 0 || !is_ascii_word_byte(bytes[index - 1]);
+        let after_index = index + marker.len();
+        let after = after_index == bytes.len() || !is_ascii_word_byte(bytes[after_index]);
+        before && after
+    })
+}
+
+fn is_ascii_word_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
 fn is_preference_only(body: &str, concern: Option<BlockerConcern>) -> bool {

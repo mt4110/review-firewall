@@ -81,8 +81,10 @@ fn codeowner_pattern_matches(pattern: &str, candidate_path: &str) -> bool {
     let stripped = normalized_pattern.trim_start_matches('/');
     let patterns = if stripped.ends_with('/') {
         vec![format!("{stripped}**")]
-    } else {
+    } else if can_match_descendant_directory(stripped) {
         vec![stripped.to_owned(), format!("{stripped}/**")]
+    } else {
+        vec![stripped.to_owned()]
     };
 
     if anchored {
@@ -109,6 +111,11 @@ fn codeowner_pattern_matches(pattern: &str, candidate_path: &str) -> bool {
         }
         false
     }
+}
+
+fn can_match_descendant_directory(pattern: &str) -> bool {
+    let last_segment = pattern.rsplit('/').next().unwrap_or(pattern);
+    !last_segment.contains(['*', '?'])
 }
 
 fn glob_matches(pattern: &str, candidate: &str) -> bool {
@@ -235,5 +242,21 @@ mod tests {
         );
 
         assert!(advisory.owner_match);
+    }
+
+    #[test]
+    fn single_level_wildcards_do_not_match_descendant_files() {
+        let advisory = build_ownership_advisory(
+            "alice",
+            Some("docs/build-app/troubleshooting.md"),
+            &[String::from("docs/build-app/troubleshooting.md")],
+            &[CodeownerRule {
+                pattern: "docs/*".into(),
+                owners: vec!["@alice".into()],
+            }],
+            true,
+        );
+
+        assert!(!advisory.owner_match);
     }
 }

@@ -73,6 +73,22 @@ fn changed_path_alone_is_not_present_pr_impact() {
 }
 
 #[test]
+fn pr_scope_markers_require_word_boundaries() {
+    let scan = base_scan(
+        "This can break consumers where emergency handling fails because response contract changes.",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert!(!comment.present_pr_impact);
+    assert!(gate.residual_blockers.is_empty());
+}
+
+#[test]
 fn failure_mode_and_evidence_detection_is_case_insensitive() {
     let scan =
         base_scan("This PR can Break consumers Because response contract changes in this PR.");
