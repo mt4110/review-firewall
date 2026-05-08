@@ -295,6 +295,25 @@ fn git_remote_parser_prefers_origin_fetch() {
 }
 
 #[test]
+fn git_remote_parser_skips_non_github_origin_for_github_remote() {
+    let parsed = adapter::git::parse_repository_identity_from_remotes_for_tests(
+        "origin\tgit@gitlab.com:example/wrong-host.git (fetch)\norigin\tgit@gitlab.com:example/wrong-host.git (push)\nupstream\tgit@github.com:example/review-firewall.git (fetch)\nupstream\tgit@github.com:example/review-firewall.git (push)\n",
+    )
+    .expect("parsed github remote");
+
+    assert_eq!(parsed.host, "github.com");
+    assert_eq!(parsed.full_name, "example/review-firewall");
+}
+
+#[test]
+fn git_remote_parser_rejects_non_github_hosts() {
+    assert!(
+        adapter::git::parse_github_remote_for_tests("git@gitlab.com:example/review-firewall.git")
+            .is_none()
+    );
+}
+
+#[test]
 fn git_remote_parser_supports_enterprise_hosts() {
     let ssh = adapter::git::parse_github_remote_for_tests(
         "git@ghe.example.com:example/review-firewall.git",

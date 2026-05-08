@@ -173,6 +173,9 @@ pub fn changed_files(repo_root: &Path, base_branch: Option<&str>) -> PathsProbe 
 fn parse_github_remote(remote: &str) -> Option<RepositoryIdentity> {
     let remote = remote.trim();
     let (host, suffix) = parse_remote_host_and_path(remote)?;
+    if !is_github_compatible_host(host) {
+        return None;
+    }
     let suffix = suffix.trim_start_matches([':', '/']);
     let suffix = suffix.strip_suffix(".git").unwrap_or(suffix);
     let mut parts = suffix
@@ -188,6 +191,15 @@ fn parse_github_remote(remote: &str) -> Option<RepositoryIdentity> {
         host: host.to_owned(),
         full_name: format!("{owner}/{name}"),
     })
+}
+
+fn is_github_compatible_host(host: &str) -> bool {
+    let host = host.to_ascii_lowercase();
+    host == "github.com"
+        || host.starts_with("github.")
+        || host.starts_with("ghe.")
+        || host.contains(".github.")
+        || host.contains(".ghe.")
 }
 
 fn parse_repository_identity_from_remotes(output: &str) -> Option<RepositoryIdentity> {
