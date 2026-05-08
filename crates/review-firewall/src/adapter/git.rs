@@ -132,16 +132,16 @@ pub fn changed_files(repo_root: &Path, base_branch: Option<&str>) -> PathsProbe 
         ]);
     }
     attempts.push(vec![
-        String::from("diff"),
-        String::from("--name-only"),
-        String::from("HEAD~1"),
-        String::from("HEAD"),
-    ]);
-    attempts.push(vec![
         String::from("status"),
         String::from("--porcelain=v1"),
         String::from("-z"),
         String::from("--untracked-files=all"),
+    ]);
+    attempts.push(vec![
+        String::from("diff"),
+        String::from("--name-only"),
+        String::from("HEAD~1"),
+        String::from("HEAD"),
     ]);
 
     for attempt in attempts {

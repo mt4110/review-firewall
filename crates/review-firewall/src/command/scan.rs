@@ -172,7 +172,7 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                 &mut reason,
                 &mut warnings,
                 Some(error),
-                Status::Error,
+                Status::Partial,
             );
             let local_changed = git::changed_files(&repo_root.path, None);
             changed_files = local_changed.paths;

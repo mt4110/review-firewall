@@ -2,7 +2,8 @@
 
 use std::env;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[path = "../src/adapter/mod.rs"]
@@ -26,6 +27,21 @@ fn temp_dir(name: &str) -> PathBuf {
     ));
     fs::create_dir_all(&directory).expect("temp dir");
     directory
+}
+
+fn run_git(repo: &Path, args: &[&str]) {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(repo)
+        .output()
+        .expect("run git");
+    assert!(
+        output.status.success(),
+        "git {:?} failed\nstdout={}\nstderr={}",
+        args,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 #[test]
@@ -167,6 +183,26 @@ fn git_status_parser_keeps_spaces_from_porcelain_z() {
     let parsed = adapter::git::parse_status_paths_for_tests("?? docs/has space.md\0");
 
     assert_eq!(parsed, vec!["docs/has space.md"]);
+}
+
+#[test]
+fn git_changed_files_prefers_worktree_status_over_previous_commit() {
+    let repo = temp_dir("changed-files-status");
+    run_git(&repo, &["init", "--initial-branch=main"]);
+    run_git(&repo, &["config", "user.email", "review-bot@example.com"]);
+    run_git(&repo, &["config", "user.name", "Review Bot"]);
+    fs::write(repo.join("stale.rs"), "initial\n").expect("write stale initial");
+    run_git(&repo, &["add", "stale.rs"]);
+    run_git(&repo, &["commit", "-m", "initial"]);
+    fs::write(repo.join("stale.rs"), "second\n").expect("write stale second");
+    run_git(&repo, &["add", "stale.rs"]);
+    run_git(&repo, &["commit", "-m", "second"]);
+    fs::write(repo.join("current.rs"), "worktree\n").expect("write current");
+
+    let changed = adapter::git::changed_files(&repo, None);
+
+    assert_eq!(changed.paths, vec![String::from("current.rs")]);
+    assert!(changed.reason.is_none());
 }
 
 #[test]

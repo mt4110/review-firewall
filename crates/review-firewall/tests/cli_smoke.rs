@@ -310,7 +310,7 @@ fn config_partial_status_reaches_reply_and_escalation_commands() {
 }
 
 #[test]
-fn stopless_error_path_still_writes_artifacts() {
+fn stopless_partial_path_still_writes_artifacts() {
     let repo = temp_dir("smoke-error");
     init_repo(&repo);
     let gh_stub = install_gh_error_stub(&repo);
@@ -342,9 +342,9 @@ fn stopless_error_path_still_writes_artifacts() {
     let scan = fs::read_to_string(run_dir.join("scan.json")).expect("scan");
     let report = fs::read_to_string(run_dir.join("report.md")).expect("report");
 
-    assert!(scan.contains(r#""status": "ERROR""#));
+    assert!(scan.contains(r#""status": "PARTIAL""#));
     assert!(scan.contains("gh stub failure"));
-    assert!(report.contains("STATUS: ERROR"));
+    assert!(report.contains("STATUS: PARTIAL"));
 }
 
 fn run(command: &mut Command) {
