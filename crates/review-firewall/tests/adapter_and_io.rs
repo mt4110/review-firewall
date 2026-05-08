@@ -206,7 +206,7 @@ fn git_changed_files_prefers_worktree_status_over_previous_commit() {
 }
 
 #[test]
-fn git_changed_files_falls_through_to_previous_commit_when_status_is_empty() {
+fn git_changed_files_does_not_use_previous_commit_when_status_is_empty() {
     let repo = temp_dir("changed-files-clean");
     run_git(&repo, &["init", "--initial-branch=main"]);
     run_git(&repo, &["config", "user.email", "review-bot@example.com"]);
@@ -220,8 +220,11 @@ fn git_changed_files_falls_through_to_previous_commit_when_status_is_empty() {
 
     let changed = adapter::git::changed_files(&repo, None);
 
-    assert_eq!(changed.paths, vec![String::from("second.rs")]);
-    assert!(changed.reason.is_none());
+    assert!(changed.paths.is_empty());
+    assert_eq!(
+        changed.reason.as_deref(),
+        Some("No local changed files detected")
+    );
 }
 
 #[test]

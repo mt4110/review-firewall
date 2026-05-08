@@ -96,17 +96,6 @@ fn label_thread(thread: &ReviewThread) -> (EscalationLabel, String) {
 
     if contains_any(
         &text,
-        &["null", "retry", "test", "bug", "migration", "rollback"],
-    ) {
-        return (
-            EscalationLabel::StayInPr,
-            String::from(
-                "The thread is long, but it still reads like a PR-local bug or test discussion.",
-            ),
-        );
-    }
-    if contains_any(
-        &text,
         &[
             "public api",
             "external api",
@@ -137,6 +126,17 @@ fn label_thread(thread: &ReviewThread) -> (EscalationLabel, String) {
         return (
             EscalationLabel::MoveToAdr,
             String::from("The thread has moved into design or architecture territory."),
+        );
+    }
+    if contains_any(
+        &text,
+        &["null", "retry", "test", "bug", "migration", "rollback"],
+    ) {
+        return (
+            EscalationLabel::StayInPr,
+            String::from(
+                "The thread is long, but it still reads like a PR-local bug or test discussion.",
+            ),
         );
     }
     (
@@ -278,6 +278,34 @@ mod tests {
                     original_line: None,
                 },
             ],
+        };
+
+        let candidates = evaluate_escalation_candidates(&[thread], 2);
+
+        assert_eq!(candidates[0].label, EscalationLabel::MoveToAdr);
+    }
+
+    #[test]
+    fn design_signals_beat_pr_local_migration_terms() {
+        let thread = ReviewThread {
+            thread_id: "schema".into(),
+            root_comment_id: "schema".into(),
+            path: Some("src/api.rs".into()),
+            participants: vec!["reviewer".into(), "author".into()],
+            roundtrips: 3,
+            comments: vec![CommentRecord {
+                comment_id: "schema".into(),
+                thread_id: "schema".into(),
+                author: "reviewer".into(),
+                body: "The schema contract and migration plan need an architecture decision."
+                    .into(),
+                path: Some("src/api.rs".into()),
+                source: CommentSource::ReviewComment,
+                reply_to_comment_id: None,
+                created_at: None,
+                line: None,
+                original_line: None,
+            }],
         };
 
         let candidates = evaluate_escalation_candidates(&[thread], 2);
