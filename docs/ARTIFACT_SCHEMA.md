@@ -77,7 +77,14 @@ Minimum shape:
   "review_comments": 17,
   "threads": 6,
   "codeowners_found": true,
-  "policy_found": true
+  "policy_found": true,
+  "product_boundary": {
+    "category": "post_review_triage_firewall",
+    "consumes_existing_review_comments": true,
+    "generates_ai_reviews": false,
+    "posts_pr_comments": false,
+    "uses_llm_for_core_judgment": false
+  }
 }
 ```
 
@@ -91,7 +98,6 @@ Recommended additional fields:
 - `issue_comments`
 - `review_decisions`
 - `partial_sources`
-- `product_boundary`
 
 `product_boundary` records the product-category contract for auditability:
 

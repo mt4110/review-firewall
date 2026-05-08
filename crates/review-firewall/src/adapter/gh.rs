@@ -64,6 +64,23 @@ pub fn issue_comments(
     )
 }
 
+pub fn changed_files(
+    repo_root: &Path,
+    repository_full_name: &str,
+    repository_host: &str,
+    pr_number: u64,
+) -> Result<Vec<Value>, String> {
+    paged_array(
+        repo_root,
+        repository_full_name,
+        repository_host,
+        pr_number,
+        "pulls",
+        "files",
+        "gh changed files failed",
+    )
+}
+
 fn paged_array(
     repo_root: &Path,
     repository_full_name: &str,

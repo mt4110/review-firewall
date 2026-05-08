@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::Path;
 
 use rf_core::domain::{
@@ -75,6 +76,28 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
             );
 
             if let (Some(pr_number), Some(repository)) = (pr.number, repository.identity.clone()) {
+                match gh::changed_files(
+                    &repo_root.path,
+                    &repository.full_name,
+                    repository.host.as_str(),
+                    pr_number,
+                ) {
+                    Ok(values) => {
+                        changed_files =
+                            merge_changed_files(changed_files, &api_changed_files(&values));
+                    }
+                    Err(error) => {
+                        partial_sources.push(String::from("changed_files"));
+                        merge_probe_reason(
+                            &mut status,
+                            &mut reason,
+                            &mut warnings,
+                            Some(error),
+                            Status::Partial,
+                        );
+                    }
+                }
+
                 match gh::review_comments(
                     &repo_root.path,
                     &repository.full_name,
@@ -91,6 +114,7 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                                 comment
                             })
                             .collect();
+                        normalize_review_comment_thread_ids(&mut comments);
                     }
                     Err(error) => {
                         partial_sources.push(String::from("review_comments"));
@@ -112,6 +136,7 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                 ) {
                     Ok(values) => {
                         issue_comments = values.iter().filter_map(issue_comment_record).collect();
+                        normalize_issue_comment_thread_ids(&mut issue_comments);
                     }
                     Err(error) => {
                         partial_sources.push(String::from("issue_comments"));
@@ -298,6 +323,18 @@ fn pr_changed_files(value: &Value) -> Vec<String> {
         .collect()
 }
 
+fn api_changed_files(values: &[Value]) -> Vec<String> {
+    values
+        .iter()
+        .filter_map(|file| {
+            file.get("filename")
+                .or_else(|| file.get("path"))
+                .and_then(Value::as_str)
+        })
+        .map(normalize_path)
+        .collect()
+}
+
 fn merge_changed_files(mut primary: Vec<String>, supplemental: &[String]) -> Vec<String> {
     for path in supplemental {
         if !primary.iter().any(|existing| existing == path) {
@@ -311,6 +348,12 @@ fn merge_changed_files(mut primary: Vec<String>, supplemental: &[String]) -> Vec
 #[allow(dead_code)]
 pub fn merge_changed_files_for_tests(primary: Vec<String>, supplemental: &[String]) -> Vec<String> {
     merge_changed_files(primary, supplemental)
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn api_changed_files_for_tests(values: &[Value]) -> Vec<String> {
+    api_changed_files(values)
 }
 
 fn review_comment_record(value: &Value) -> Option<CommentRecord> {
@@ -351,6 +394,63 @@ fn review_comment_record(value: &Value) -> Option<CommentRecord> {
 #[allow(dead_code)]
 pub fn review_comment_record_for_tests(value: &Value) -> Option<CommentRecord> {
     review_comment_record(value)
+}
+
+fn normalize_review_comment_thread_ids(comments: &mut [CommentRecord]) {
+    let by_id = comments
+        .iter()
+        .map(|comment| {
+            (
+                comment.comment_id.clone(),
+                comment.reply_to_comment_id.clone(),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    for comment in comments {
+        comment.thread_id = root_comment_id(comment.comment_id.as_str(), &by_id);
+    }
+}
+
+fn root_comment_id(comment_id: &str, by_id: &HashMap<String, Option<String>>) -> String {
+    let mut current = comment_id;
+    let mut visited = Vec::<String>::new();
+    while let Some(Some(parent_id)) = by_id.get(current) {
+        if visited.iter().any(|seen| seen == parent_id) {
+            break;
+        }
+        visited.push(parent_id.clone());
+        current = parent_id;
+    }
+    current.to_owned()
+}
+
+fn normalize_issue_comment_thread_ids(comments: &mut [CommentRecord]) {
+    let Some(root_comment_id) = comments
+        .iter()
+        .min_by(|left, right| match left.created_at.cmp(&right.created_at) {
+            std::cmp::Ordering::Equal => left.comment_id.cmp(&right.comment_id),
+            order => order,
+        })
+        .map(|comment| comment.comment_id.clone())
+    else {
+        return;
+    };
+    let thread_id = format!("issue:{root_comment_id}");
+    for comment in comments {
+        comment.thread_id = thread_id.clone();
+    }
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn normalize_review_comment_thread_ids_for_tests(comments: &mut [CommentRecord]) {
+    normalize_review_comment_thread_ids(comments);
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn normalize_issue_comment_thread_ids_for_tests(comments: &mut [CommentRecord]) {
+    normalize_issue_comment_thread_ids(comments);
 }
 
 fn issue_comment_record(value: &Value) -> Option<CommentRecord> {

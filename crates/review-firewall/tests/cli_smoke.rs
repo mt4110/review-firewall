@@ -108,6 +108,16 @@ exit 0
 fi
 if [ "$1" = "api" ]; then
 case "$2" in
+  "repos/example/review-firewall/pulls/42/files?per_page=100&page=1")
+cat <<'JSON'
+[{"filename":"src/api.rs"}]
+JSON
+exit 0
+;;
+  "repos/example/review-firewall/pulls/42/files?per_page=100&page=2")
+echo '[]'
+exit 0
+;;
   "repos/example/review-firewall/pulls/42/comments?per_page=100&page=1")
 cat <<'JSON'
 [{"id":12,"body":"This can break the response contract in this PR because `partial` changes client handling.","path":"src/api.rs","user":{"login":"reviewer-a"},"pull_request_review_id":1,"created_at":"2026-03-28T00:00:00Z","line":10,"original_line":10},{"id":13,"body":"I agree the client contract changes here.","path":"src/api.rs","user":{"login":"author"},"pull_request_review_id":1,"created_at":"2026-03-28T00:00:01Z","in_reply_to_id":12,"line":10,"original_line":10}]
@@ -144,6 +154,14 @@ if "%1"=="pr" if "%2"=="view" (
   exit /b 0
 )
 if "%1"=="api" (
+  if "%~2"=="repos/example/review-firewall/pulls/42/files?per_page=100&page=1" (
+    echo [{"filename":"src/api.rs"}]
+    exit /b 0
+  )
+  if "%~2"=="repos/example/review-firewall/pulls/42/files?per_page=100&page=2" (
+    echo []
+    exit /b 0
+  )
   if "%~2"=="repos/example/review-firewall/pulls/42/comments?per_page=100&page=1" (
     echo [{"id":12,"body":"This can break the response contract in this PR because `partial` changes client handling.","path":"src/api.rs","user":{"login":"reviewer-a"},"pull_request_review_id":1,"created_at":"2026-03-28T00:00:00Z","line":10,"original_line":10},{"id":13,"body":"I agree the client contract changes here.","path":"src/api.rs","user":{"login":"author"},"pull_request_review_id":1,"created_at":"2026-03-28T00:00:01Z","in_reply_to_id":12,"line":10,"original_line":10}]
     exit /b 0

@@ -14,6 +14,8 @@ mod io;
 
 use serde_json::Value;
 
+use rf_core::domain::{CommentRecord, CommentSource};
+
 fn temp_dir(name: &str) -> PathBuf {
     let directory = env::temp_dir().join(format!(
         "review-firewall-{name}-{}",
@@ -219,10 +221,65 @@ fn scan_changed_files_supplements_pr_file_list_with_local_diff() {
 }
 
 #[test]
+fn scan_changed_files_reads_paged_api_filenames() {
+    let values = vec![
+        serde_json::json!({ "filename": "src\\api.rs" }),
+        serde_json::json!({ "path": "docs/contract.md" }),
+    ];
+
+    let parsed = command::scan::api_changed_files_for_tests(&values);
+
+    assert_eq!(parsed, vec!["src/api.rs", "docs/contract.md"]);
+}
+
+#[test]
+fn scan_review_replies_share_root_thread_id() {
+    let mut comments = vec![
+        comment("12", None, CommentSource::ReviewComment),
+        comment("13", Some("12"), CommentSource::ReviewComment),
+    ];
+
+    command::scan::normalize_review_comment_thread_ids_for_tests(&mut comments);
+
+    assert_eq!(comments[0].thread_id, "12");
+    assert_eq!(comments[1].thread_id, "12");
+}
+
+#[test]
+fn scan_issue_comments_share_pseudo_thread_id() {
+    let mut comments = vec![
+        comment("22", None, CommentSource::IssueComment),
+        comment("21", None, CommentSource::IssueComment),
+    ];
+    comments[0].created_at = Some(String::from("2026-03-28T00:00:01Z"));
+    comments[1].created_at = Some(String::from("2026-03-28T00:00:00Z"));
+
+    command::scan::normalize_issue_comment_thread_ids_for_tests(&mut comments);
+
+    assert_eq!(comments[0].thread_id, "issue:21");
+    assert_eq!(comments[1].thread_id, "issue:21");
+}
+
+#[test]
 fn report_action_count_includes_more_than_four_actions() {
     let count = command::report::count_author_actions_for_tests(
         "## Author action list\n1. First\n2. Second\n3. Third\n4. Fourth\n5. Fifth\n10. Tenth\n",
     );
 
     assert_eq!(count, 6);
+}
+
+fn comment(id: &str, reply_to: Option<&str>, source: CommentSource) -> CommentRecord {
+    CommentRecord {
+        comment_id: id.to_owned(),
+        thread_id: id.to_owned(),
+        author: String::from("reviewer"),
+        body: String::from("Body"),
+        path: Some(String::from("src/api.rs")),
+        source,
+        reply_to_comment_id: reply_to.map(ToOwned::to_owned),
+        created_at: Some(format!("2026-03-28T00:00:{id}Z")),
+        line: None,
+        original_line: None,
+    }
 }
