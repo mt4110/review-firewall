@@ -166,7 +166,7 @@ pub fn changed_files(repo_root: &Path, base_branch: Option<&str>) -> PathsProbe 
 
     PathsProbe {
         paths: Vec::new(),
-        reason: status_reason.or_else(|| Some(String::from("No local changed files detected"))),
+        reason: status_reason,
     }
 }
 
