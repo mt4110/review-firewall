@@ -82,9 +82,19 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     repository.host.as_str(),
                     pr_number,
                 ) {
-                    Ok(values) => {
+                    Ok(probe) => {
                         changed_files =
-                            merge_changed_files(changed_files, &api_changed_files(&values));
+                            merge_changed_files(changed_files, &api_changed_files(&probe.values));
+                        if let Some(error) = probe.reason {
+                            partial_sources.push(String::from("changed_files"));
+                            merge_probe_reason(
+                                &mut status,
+                                &mut reason,
+                                &mut warnings,
+                                Some(error),
+                                Status::Partial,
+                            );
+                        }
                     }
                     Err(error) => {
                         partial_sources.push(String::from("changed_files"));
@@ -104,8 +114,9 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     repository.host.as_str(),
                     pr_number,
                 ) {
-                    Ok(values) => {
-                        comments = values
+                    Ok(probe) => {
+                        comments = probe
+                            .values
                             .iter()
                             .filter_map(review_comment_record)
                             .map(|mut comment| {
@@ -115,6 +126,16 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                             })
                             .collect();
                         normalize_review_comment_thread_ids(&mut comments);
+                        if let Some(error) = probe.reason {
+                            partial_sources.push(String::from("review_comments"));
+                            merge_probe_reason(
+                                &mut status,
+                                &mut reason,
+                                &mut warnings,
+                                Some(error),
+                                Status::Partial,
+                            );
+                        }
                     }
                     Err(error) => {
                         partial_sources.push(String::from("review_comments"));
@@ -134,9 +155,23 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     repository.host.as_str(),
                     pr_number,
                 ) {
-                    Ok(values) => {
-                        issue_comments = values.iter().filter_map(issue_comment_record).collect();
+                    Ok(probe) => {
+                        issue_comments = probe
+                            .values
+                            .iter()
+                            .filter_map(issue_comment_record)
+                            .collect();
                         normalize_issue_comment_thread_ids(&mut issue_comments);
+                        if let Some(error) = probe.reason {
+                            partial_sources.push(String::from("issue_comments"));
+                            merge_probe_reason(
+                                &mut status,
+                                &mut reason,
+                                &mut warnings,
+                                Some(error),
+                                Status::Partial,
+                            );
+                        }
                     }
                     Err(error) => {
                         partial_sources.push(String::from("issue_comments"));

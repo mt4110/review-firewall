@@ -4,6 +4,12 @@ use serde_json::Value;
 
 use super::run_process;
 
+#[derive(Debug, Clone)]
+pub struct ValuesProbe {
+    pub values: Vec<Value>,
+    pub reason: Option<String>,
+}
+
 pub fn pr_view(repo_root: &Path, pr_number: Option<u64>) -> Result<Value, String> {
     let fields = [
         "number",
@@ -35,7 +41,7 @@ pub fn review_comments(
     repository_full_name: &str,
     repository_host: &str,
     pr_number: u64,
-) -> Result<Vec<Value>, String> {
+) -> Result<ValuesProbe, String> {
     paged_array(
         repo_root,
         repository_full_name,
@@ -52,7 +58,7 @@ pub fn issue_comments(
     repository_full_name: &str,
     repository_host: &str,
     pr_number: u64,
-) -> Result<Vec<Value>, String> {
+) -> Result<ValuesProbe, String> {
     paged_array(
         repo_root,
         repository_full_name,
@@ -69,7 +75,7 @@ pub fn changed_files(
     repository_full_name: &str,
     repository_host: &str,
     pr_number: u64,
-) -> Result<Vec<Value>, String> {
+) -> Result<ValuesProbe, String> {
     paged_array(
         repo_root,
         repository_full_name,
@@ -89,11 +95,8 @@ fn paged_array(
     resource: &str,
     suffix: &str,
     fallback: &str,
-) -> Result<Vec<Value>, String> {
-    let mut page = 1usize;
-    let mut items = Vec::new();
-
-    loop {
+) -> Result<ValuesProbe, String> {
+    collect_paged_arrays(|page| {
         let endpoint = format!(
             "repos/{repository_full_name}/{resource}/{pr_number}/{suffix}?per_page=100&page={page}"
         );
@@ -103,18 +106,59 @@ fn paged_array(
             args.push(repository_host.to_owned());
         }
         args.push(endpoint);
-        let output = parse_json_output(repo_root, &args, fallback)?;
-        let page_items = output
-            .as_array()
-            .cloned()
-            .ok_or_else(|| String::from("gh api returned invalid JSON array"))?;
+        parse_json_output(repo_root, &args, fallback)
+    })
+}
+
+fn collect_paged_arrays<F>(mut fetch_page: F) -> Result<ValuesProbe, String>
+where
+    F: FnMut(usize) -> Result<Value, String>,
+{
+    let mut page = 1usize;
+    let mut items = Vec::new();
+
+    loop {
+        let output = match fetch_page(page) {
+            Ok(output) => output,
+            Err(error) if items.is_empty() => return Err(error),
+            Err(error) => {
+                return Ok(ValuesProbe {
+                    values: items,
+                    reason: Some(error),
+                });
+            }
+        };
+        let page_items = match output.as_array().cloned() {
+            Some(page_items) => page_items,
+            None if items.is_empty() => {
+                return Err(String::from("gh api returned invalid JSON array"));
+            }
+            None => {
+                return Ok(ValuesProbe {
+                    values: items,
+                    reason: Some(String::from("gh api returned invalid JSON array")),
+                });
+            }
+        };
         let page_len = page_items.len();
         items.extend(page_items);
         if page_len < 100 {
-            return Ok(items);
+            return Ok(ValuesProbe {
+                values: items,
+                reason: None,
+            });
         }
         page += 1;
     }
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn collect_paged_arrays_for_tests(
+    pages: Vec<Result<Value, String>>,
+) -> Result<ValuesProbe, String> {
+    let mut pages = pages.into_iter();
+    collect_paged_arrays(|_| pages.next().unwrap_or_else(|| Ok(Value::Array(Vec::new()))))
 }
 
 fn parse_json_output(repo_root: &Path, args: &[String], fallback: &str) -> Result<Value, String> {

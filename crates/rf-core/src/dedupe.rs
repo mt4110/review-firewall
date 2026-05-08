@@ -45,7 +45,8 @@ fn duplicate_key(comment: &ClassifiedComment) -> Option<String> {
         return None;
     }
     Some(format!(
-        "{}|{:?}|{}",
+        "{}|{}|{:?}|{}",
+        comment.comment.thread_id,
         comment
             .comment
             .path

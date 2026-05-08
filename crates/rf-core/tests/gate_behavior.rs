@@ -250,3 +250,31 @@ fn residual_blockers_collapse_to_one_per_thread() {
     assert_eq!(gate.candidate_blockers.len(), 1);
     assert_eq!(gate.duplicates_collapsed.len(), 1);
 }
+
+#[test]
+fn duplicate_detection_preserves_identical_text_in_separate_threads() {
+    let mut scan = base_scan(
+        "This can break the response contract in this PR because `partial` changes client handling.",
+    );
+    scan.comments.push(CommentRecord {
+        comment_id: String::from("99"),
+        thread_id: String::from("99"),
+        author: String::from("reviewer-a"),
+        body: String::from(
+            "This can break the response contract in this PR because `partial` changes client handling.",
+        ),
+        path: Some(String::from("src/api/response.rs")),
+        source: CommentSource::ReviewComment,
+        reply_to_comment_id: None,
+        created_at: Some(String::from("2026-03-28T00:00:01Z")),
+        line: Some(20),
+        original_line: Some(20),
+    });
+    scan.review_threads = build_review_threads(&scan.comments);
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    assert_eq!(gate.residual_blockers.len(), 2);
+    assert_eq!(gate.candidate_blockers.len(), 2);
+    assert!(gate.duplicates_collapsed.is_empty());
+}

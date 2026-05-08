@@ -330,6 +330,22 @@ fn scan_changed_files_reads_paged_api_filenames() {
 }
 
 #[test]
+fn gh_paged_array_preserves_items_when_later_page_fails() {
+    let first_page = (0..100)
+        .map(|index| serde_json::json!({ "id": index }))
+        .collect::<Vec<_>>();
+
+    let probe = adapter::gh::collect_paged_arrays_for_tests(vec![
+        Ok(serde_json::Value::Array(first_page)),
+        Err(String::from("rate limited")),
+    ])
+    .expect("partial page result");
+
+    assert_eq!(probe.values.len(), 100);
+    assert_eq!(probe.reason.as_deref(), Some("rate limited"));
+}
+
+#[test]
 fn scan_review_replies_share_root_thread_id() {
     let mut comments = vec![
         comment("12", None, CommentSource::ReviewComment),
