@@ -37,9 +37,7 @@ pub fn build_conversation_threads_for_author(
     pr_author: Option<&str>,
 ) -> Vec<ReviewThread> {
     let mut threads = build_review_threads_for_author(review_comments, pr_author);
-    if let Some(issue_thread) = build_issue_comment_thread(issue_comments, pr_author) {
-        threads.push(issue_thread);
-    }
+    threads.extend(build_issue_comment_threads(issue_comments, pr_author));
     threads
 }
 
@@ -84,30 +82,37 @@ pub fn build_review_threads_for_author(
         .collect()
 }
 
-fn build_issue_comment_thread(
+fn build_issue_comment_threads(
     comments: &[CommentRecord],
     pr_author: Option<&str>,
-) -> Option<ReviewThread> {
-    let mut thread_comments = comments.to_vec();
-    if thread_comments.is_empty() {
-        return None;
+) -> Vec<ReviewThread> {
+    let mut grouped = BTreeMap::<String, Vec<CommentRecord>>::new();
+    for comment in comments {
+        let thread_id =
+            fallback_thread_id(comment).unwrap_or_else(|| format!("issue:{}", comment.comment_id));
+        let mut threaded = comment.clone();
+        threaded.thread_id = thread_id.clone();
+        grouped.entry(thread_id).or_default().push(threaded);
     }
 
-    thread_comments.sort_by(sort_comment_records);
-    let root_comment_id = thread_comments.first()?.comment_id.clone();
-    let thread_id = format!("issue:{root_comment_id}");
-    for comment in &mut thread_comments {
-        comment.thread_id = thread_id.clone();
-    }
-
-    Some(ReviewThread {
-        thread_id,
-        root_comment_id,
-        path: None,
-        participants: unique_participants(&thread_comments),
-        roundtrips: count_roundtrips(&thread_comments, pr_author),
-        comments: thread_comments,
-    })
+    grouped
+        .into_iter()
+        .map(|(thread_id, mut thread_comments)| {
+            thread_comments.sort_by(sort_comment_records);
+            let root_comment_id = thread_comments
+                .first()
+                .map(|comment| comment.comment_id.clone())
+                .unwrap_or_else(|| thread_id.trim_start_matches("issue:").to_owned());
+            ReviewThread {
+                thread_id,
+                root_comment_id,
+                path: None,
+                participants: unique_participants(&thread_comments),
+                roundtrips: count_roundtrips(&thread_comments, pr_author),
+                comments: thread_comments,
+            }
+        })
+        .collect()
 }
 
 fn resolve_root_comment_id(
@@ -318,7 +323,7 @@ mod tests {
     }
 
     #[test]
-    fn folds_issue_comments_into_a_pseudo_thread() {
+    fn keeps_issue_comments_as_independent_pseudo_threads() {
         let issue_comments = vec![
             CommentRecord {
                 comment_id: "10".into(),
@@ -348,20 +353,26 @@ mod tests {
 
         let threads = build_conversation_threads(&[], &issue_comments);
 
-        assert_eq!(threads.len(), 1);
+        assert_eq!(threads.len(), 2);
         assert_eq!(threads[0].thread_id, "issue:10");
         assert_eq!(threads[0].roundtrips, 0);
-        assert_eq!(threads[0].participants, vec!["reviewer", "author"]);
+        assert_eq!(threads[0].participants, vec!["reviewer"]);
+        assert_eq!(threads[1].thread_id, "issue:11");
+        assert_eq!(threads[1].roundtrips, 0);
+        assert_eq!(threads[1].participants, vec!["author"]);
     }
 
     #[test]
-    fn issue_comment_roundtrips_use_author_reviewer_handoffs() {
-        let issue_comments = vec![
+    fn issue_comment_roundtrips_use_author_reviewer_handoffs_when_thread_id_is_shared() {
+        let mut issue_comments = vec![
             issue_comment("10", "reviewer-a", "2026-03-28T00:00:00Z"),
             issue_comment("11", "reviewer-b", "2026-03-28T00:00:01Z"),
             issue_comment("12", "author", "2026-03-28T00:00:02Z"),
             issue_comment("13", "reviewer-c", "2026-03-28T00:00:03Z"),
         ];
+        for comment in &mut issue_comments {
+            comment.thread_id = String::from("issue:contract");
+        }
 
         let threads = build_conversation_threads_for_author(&[], &issue_comments, Some("author"));
 

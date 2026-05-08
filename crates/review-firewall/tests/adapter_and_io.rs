@@ -142,16 +142,16 @@ fn codeowners_detection_prefers_github_directory() {
 }
 
 #[test]
-fn codeowners_detection_preserves_empty_owner_overrides() {
-    let repo = temp_dir("codeowners-empty-owner");
+fn codeowners_detection_ignores_entries_without_owners() {
+    let repo = temp_dir("codeowners-ownerless");
     fs::write(repo.join("CODEOWNERS"), "/apps/ @platform\n/apps/github\n").expect("write root");
 
     let loaded = io::codeowners::load(&repo);
 
     assert!(loaded.found);
-    assert_eq!(loaded.rules.len(), 2);
-    assert_eq!(loaded.rules[1].pattern, "/apps/github");
-    assert!(loaded.rules[1].owners.is_empty());
+    assert_eq!(loaded.rules.len(), 1);
+    assert_eq!(loaded.rules[0].pattern, "/apps/");
+    assert_eq!(loaded.rules[0].owners, vec![String::from("@platform")]);
 }
 
 #[test]
@@ -166,7 +166,7 @@ fn codeowners_detection_ignores_inline_comments_and_invalid_owner_lines() {
     let loaded = io::codeowners::load(&repo);
 
     assert!(loaded.found);
-    assert_eq!(loaded.rules.len(), 3);
+    assert_eq!(loaded.rules.len(), 2);
     assert_eq!(loaded.rules[0].pattern, "/apps/*");
     assert_eq!(loaded.rules[0].owners, vec![String::from("@platform")]);
     assert_eq!(loaded.rules[1].pattern, "/docs/*");
@@ -174,8 +174,6 @@ fn codeowners_detection_ignores_inline_comments_and_invalid_owner_lines() {
         loaded.rules[1].owners,
         vec![String::from("docs@example.com")]
     );
-    assert_eq!(loaded.rules[2].pattern, "/internal");
-    assert!(loaded.rules[2].owners.is_empty());
 }
 
 #[test]
@@ -482,7 +480,7 @@ fn scan_review_replies_share_root_thread_id() {
 }
 
 #[test]
-fn scan_issue_comments_share_pseudo_thread_id() {
+fn scan_issue_comments_keep_independent_pseudo_thread_ids() {
     let mut comments = vec![
         comment("22", None, CommentSource::IssueComment),
         comment("21", None, CommentSource::IssueComment),
@@ -492,7 +490,7 @@ fn scan_issue_comments_share_pseudo_thread_id() {
 
     command::scan::normalize_issue_comment_thread_ids_for_tests(&mut comments);
 
-    assert_eq!(comments[0].thread_id, "issue:21");
+    assert_eq!(comments[0].thread_id, "issue:22");
     assert_eq!(comments[1].thread_id, "issue:21");
 }
 

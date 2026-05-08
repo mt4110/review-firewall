@@ -113,7 +113,8 @@ crates/
 
 Windows 互換性のため、`latest` symlink ではなく `latest.json` を使います。
 
-v0.1 では、PR 全体の issue comment を `escalate` が長い設計論争として見落とさないよう、粗い pseudo-thread に畳み込むことがあります。
+v0.1 では、PR 全体の issue comment は、入力側が明示的に同じ thread id を持っている場合を除き、独立した pseudo-thread として扱います。
+これにより、無関係な PR-level 会話が escalation signal を過剰に膨らませないようにします。
 
 ## 開発
 

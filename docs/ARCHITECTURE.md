@@ -202,7 +202,8 @@ Collect and normalize:
 - review comments
 - issue comments when available
 
-For v0.1, general PR issue comments may be flattened into a coarse pseudo-thread so escalation can still see long-running design debate without adding hosted logic.
+For v0.1, general PR issue comments are kept as independent pseudo-threads unless the input already carries an explicit shared thread id.
+This avoids inferring one long debate from unrelated top-level comments without adding hosted topic inference.
 
 Output:
 

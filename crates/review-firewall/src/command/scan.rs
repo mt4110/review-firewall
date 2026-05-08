@@ -473,19 +473,15 @@ fn root_comment_id(comment_id: &str, by_id: &HashMap<String, Option<String>>) ->
 }
 
 fn normalize_issue_comment_thread_ids(comments: &mut [CommentRecord]) {
-    let Some(root_comment_id) = comments
-        .iter()
-        .min_by(|left, right| match left.created_at.cmp(&right.created_at) {
-            std::cmp::Ordering::Equal => left.comment_id.cmp(&right.comment_id),
-            order => order,
-        })
-        .map(|comment| comment.comment_id.clone())
-    else {
-        return;
-    };
-    let thread_id = format!("issue:{root_comment_id}");
     for comment in comments {
-        comment.thread_id = thread_id.clone();
+        let thread_id = comment.thread_id.trim();
+        if thread_id.is_empty() {
+            comment.thread_id = format!("issue:{}", comment.comment_id);
+        } else if !thread_id.starts_with("issue:") {
+            comment.thread_id = format!("issue:{thread_id}");
+        } else {
+            comment.thread_id = thread_id.to_owned();
+        }
     }
 }
 

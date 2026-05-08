@@ -111,7 +111,8 @@ crates/
 
 `latest.json` is used instead of a symlink so the run store stays Windows-compatible.
 
-For v0.1, top-level PR issue comments may be flattened into a coarse pseudo-thread so `escalate` can still see long-running design discussion.
+For v0.1, top-level PR issue comments remain independent pseudo-threads unless the input carries an explicit shared thread id.
+This keeps unrelated PR-level conversations from inflating escalation signals.
 
 ## Development
 
