@@ -202,6 +202,9 @@ Collect and normalize:
 - review comments
 - issue comments when available
 
+When PR file data is available from GitHub, it is authoritative.
+Local git changed files are a fallback for local-only or partial GitHub metadata, not a supplement to an already populated PR file list.
+
 For v0.1, general PR issue comments are kept as one chronological PR-conversation thread unless the input already carries an explicit shared thread id.
 This preserves author/reviewer roundtrips from the PR conversation tab without adding hosted topic inference.
 

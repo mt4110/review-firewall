@@ -480,7 +480,7 @@ fn scan_normalization_drops_empty_review_decisions() {
 }
 
 #[test]
-fn scan_changed_files_supplements_pr_file_list_with_local_diff() {
+fn scan_changed_files_supplements_pr_file_list_with_api_files() {
     let merged = command::scan::merge_changed_files_for_tests(
         vec![String::from("src/a.rs"), String::from("src/b.rs")],
         &[String::from("src/b.rs"), String::from("src/c.rs")],
@@ -494,6 +494,21 @@ fn scan_changed_files_supplements_pr_file_list_with_local_diff() {
             String::from("src/c.rs")
         ]
     );
+}
+
+#[test]
+fn scan_changed_files_use_local_diff_only_when_pr_files_are_unavailable() {
+    let kept = command::scan::fallback_changed_files_from_local_for_tests(
+        vec![String::from("src/pr.rs")],
+        vec![String::from("src/local.rs")],
+    );
+    let fallback = command::scan::fallback_changed_files_from_local_for_tests(
+        Vec::new(),
+        vec![String::from("src/local.rs")],
+    );
+
+    assert_eq!(kept, vec![String::from("src/pr.rs")]);
+    assert_eq!(fallback, vec![String::from("src/local.rs")]);
 }
 
 #[test]

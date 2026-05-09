@@ -72,16 +72,6 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                 })
                 .unwrap_or_else(|| git::repository_identity(&repo_root.path));
 
-            let local_changed = git::changed_files(&repo_root.path, pr.base_branch.as_deref());
-            changed_files = merge_changed_files(changed_files, &local_changed.paths);
-            merge_probe_reason(
-                &mut status,
-                &mut reason,
-                &mut warnings,
-                local_changed.reason,
-                Status::Partial,
-            );
-
             if let (Some(pr_number), Some(repository)) = (pr.number, repository.identity.clone()) {
                 match gh::changed_files(
                     &repo_root.path,
@@ -113,6 +103,20 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                             Status::Partial,
                         );
                     }
+                }
+
+                if changed_files.is_empty() {
+                    let local_changed =
+                        git::changed_files(&repo_root.path, pr.base_branch.as_deref());
+                    changed_files =
+                        fallback_changed_files_from_local(changed_files, local_changed.paths);
+                    merge_probe_reason(
+                        &mut status,
+                        &mut reason,
+                        &mut warnings,
+                        local_changed.reason,
+                        Status::Partial,
+                    );
                 }
 
                 match gh::review_comments(
@@ -198,6 +202,19 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     Some(pr.author.as_str()),
                 );
             } else if pr.number.is_some() && repository.identity.is_none() {
+                if changed_files.is_empty() {
+                    let local_changed =
+                        git::changed_files(&repo_root.path, pr.base_branch.as_deref());
+                    changed_files =
+                        fallback_changed_files_from_local(changed_files, local_changed.paths);
+                    merge_probe_reason(
+                        &mut status,
+                        &mut reason,
+                        &mut warnings,
+                        local_changed.reason,
+                        Status::Partial,
+                    );
+                }
                 partial_sources.push(String::from("repository_identity"));
                 merge_probe_reason(
                     &mut status,
@@ -427,10 +444,23 @@ fn merge_changed_files(mut primary: Vec<String>, supplemental: &[String]) -> Vec
     primary
 }
 
+fn fallback_changed_files_from_local(primary: Vec<String>, local: Vec<String>) -> Vec<String> {
+    if primary.is_empty() { local } else { primary }
+}
+
 #[cfg(test)]
 #[allow(dead_code)]
 pub fn merge_changed_files_for_tests(primary: Vec<String>, supplemental: &[String]) -> Vec<String> {
     merge_changed_files(primary, supplemental)
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn fallback_changed_files_from_local_for_tests(
+    primary: Vec<String>,
+    local: Vec<String>,
+) -> Vec<String> {
+    fallback_changed_files_from_local(primary, local)
 }
 
 #[cfg(test)]

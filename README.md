@@ -111,8 +111,11 @@ crates/
 
 `latest.json` is used instead of a symlink so the run store stays Windows-compatible.
 
+When GitHub returns PR file data, that file list is authoritative.
+Local git changed files are used only as a fallback when PR file data is unavailable.
+
 For v0.1, top-level PR issue comments are preserved as one chronological PR-conversation thread unless the input carries an explicit shared thread id.
-This keeps unrelated PR-level conversations from inflating escalation signals.
+This preserves PR-level back-and-forth while keeping hosted topic inference out of v0.1.
 
 ## Development
 
