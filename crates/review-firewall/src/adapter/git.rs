@@ -184,6 +184,8 @@ pub fn repository_identity(repo_root: &Path) -> RepositoryProbe {
     }
 }
 
+#[cfg(test)]
+#[allow(dead_code)]
 pub fn changed_files(repo_root: &Path, base_branch: Option<&str>) -> PathsProbe {
     let mut paths = Vec::new();
     let status_attempt = vec![
@@ -285,6 +287,8 @@ fn summarize_reasons(reasons: &[String]) -> String {
         .to_owned()
 }
 
+#[cfg(test)]
+#[allow(dead_code)]
 fn combine_reasons(first: Option<String>, second: Option<String>) -> Option<String> {
     match (first, second) {
         (Some(first), Some(second)) => Some(format!("{first}; {second}")),
@@ -423,6 +427,7 @@ fn parse_changed_paths(output: &str) -> Vec<String> {
     )
 }
 
+#[cfg(test)]
 fn parse_status_paths(output: &str) -> Vec<String> {
     let mut paths = Vec::new();
     let records = output

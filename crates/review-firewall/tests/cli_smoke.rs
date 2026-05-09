@@ -666,6 +666,11 @@ fn stopless_partial_path_still_writes_artifacts() {
     run(Command::new("git")
         .args(["commit", "-m", "local-only change"])
         .current_dir(&repo));
+    fs::write(
+        repo.join("src").join("scratch.rs"),
+        "pub fn scratch_change() {}\n",
+    )
+    .expect("write untracked scratch source");
     let gh_stub = install_gh_error_stub(&repo);
 
     for args in [
@@ -698,6 +703,7 @@ fn stopless_partial_path_still_writes_artifacts() {
     assert!(scan.contains(r#""status": "PARTIAL""#));
     assert!(scan.contains("gh stub failure"));
     assert!(scan.contains("src/local_only.rs"));
+    assert!(!scan.contains("src/scratch.rs"));
     assert!(report.contains("STATUS: PARTIAL"));
 }
 
