@@ -207,6 +207,26 @@ fn git_remote_parser_normalizes_trailing_slash_after_git_suffix() {
 }
 
 #[test]
+fn git_remote_parser_preserves_https_enterprise_port() {
+    let parsed = adapter::git::parse_github_remote_for_tests(
+        "https://gh.example.com:8443/example/review-firewall.git",
+    )
+    .expect("parsed remote with port");
+
+    assert_eq!(parsed.host, "gh.example.com:8443");
+    assert_eq!(parsed.full_name, "example/review-firewall");
+}
+
+#[test]
+fn git_remote_parser_skips_known_non_github_host_with_port() {
+    let parsed = adapter::git::parse_github_remote_for_tests(
+        "https://gitlab.com:8443/example/review-firewall.git",
+    );
+
+    assert!(parsed.is_none());
+}
+
+#[test]
 fn git_status_parser_normalizes_windows_rename_paths() {
     let parsed = adapter::git::parse_status_paths_for_tests(
         "R  src\\new.rs\0src\\old.rs\0?? crates\\rf-core\\src\\lib.rs\0",
@@ -471,6 +491,17 @@ fn scan_repository_identity_uses_pr_url_host() {
     .expect("parsed pr url");
 
     assert_eq!(parsed.host, "git.company.internal");
+    assert_eq!(parsed.full_name, "example/review-firewall");
+}
+
+#[test]
+fn scan_repository_identity_preserves_pr_url_port() {
+    let parsed = command::scan::parse_pr_url_repository_identity_for_tests(
+        "https://gh.example.com:8443/example/review-firewall/pull/42",
+    )
+    .expect("parsed pr url");
+
+    assert_eq!(parsed.host, "gh.example.com:8443");
     assert_eq!(parsed.full_name, "example/review-firewall");
 }
 

@@ -320,9 +320,16 @@ fn parse_github_remote(remote: &str) -> Option<RepositoryIdentity> {
 
 fn is_known_non_github_host(host: &str) -> bool {
     matches!(
-        host.to_ascii_lowercase().as_str(),
+        host_without_port(host).to_ascii_lowercase().as_str(),
         "gitlab.com" | "bitbucket.org" | "ssh.dev.azure.com" | "dev.azure.com"
     )
+}
+
+fn host_without_port(host: &str) -> &str {
+    if host.starts_with('[') {
+        return host;
+    }
+    host.split_once(':').map(|(host, _)| host).unwrap_or(host)
 }
 
 fn parse_repository_identity_from_remotes(output: &str) -> Option<RepositoryIdentity> {
@@ -402,11 +409,7 @@ fn parse_remote_host_and_path(remote: &str) -> Option<(&str, &str)> {
 }
 
 fn parse_remote_host(authority: &str) -> &str {
-    let without_user = authority.rsplit('@').next().unwrap_or(authority);
-    without_user
-        .split_once(':')
-        .map(|(host, _)| host)
-        .unwrap_or(without_user)
+    authority.rsplit('@').next().unwrap_or(authority)
 }
 
 fn parse_changed_paths(output: &str) -> Vec<String> {

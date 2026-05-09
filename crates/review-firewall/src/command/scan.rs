@@ -397,7 +397,7 @@ fn repository_identity_from_pr_url(value: &Value) -> Option<git::RepositoryIdent
 fn parse_pr_url_repository_identity(url: &str) -> Option<git::RepositoryIdentity> {
     let (_, remainder) = url.split_once("://")?;
     let (authority, path) = remainder.split_once('/')?;
-    let host = authority.split('@').next_back()?.split(':').next()?;
+    let host = authority.rsplit('@').next().unwrap_or(authority);
     let mut parts = path.split('/').filter(|part| !part.is_empty());
     let owner = parts.next()?;
     let name = parts.next()?;
