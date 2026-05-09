@@ -258,6 +258,7 @@ fn parse_github_remote(remote: &str) -> Option<RepositoryIdentity> {
     let remote = remote.trim();
     let (host, suffix) = parse_remote_host_and_path(remote)?;
     let suffix = suffix.trim_start_matches([':', '/']);
+    let suffix = suffix.trim_end_matches('/');
     let suffix = suffix.strip_suffix(".git").unwrap_or(suffix);
     let mut parts = suffix
         .split('/')
