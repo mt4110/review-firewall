@@ -252,6 +252,43 @@ fn residual_blockers_collapse_to_one_per_thread() {
 }
 
 #[test]
+fn duplicate_author_comment_does_not_hide_reviewer_blocker() {
+    let mut scan = base_scan(
+        "This can break the response contract in this PR because `partial` changes client handling.",
+    );
+    scan.pr.author = String::from("author");
+    scan.comments[0].author = String::from("author");
+    scan.comments.push(CommentRecord {
+        comment_id: String::from("13"),
+        thread_id: String::from("12"),
+        author: String::from("reviewer-a"),
+        body: String::from(
+            "This can break the response contract in this PR because `partial` changes client handling.",
+        ),
+        path: Some(String::from("src/api/response.rs")),
+        source: CommentSource::ReviewComment,
+        reply_to_comment_id: Some(String::from("12")),
+        created_at: Some(String::from("2026-03-28T00:00:01Z")),
+        line: Some(11),
+        original_line: Some(11),
+    });
+    scan.review_threads = build_review_threads(&scan.comments);
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    assert_eq!(gate.residual_blockers.len(), 1);
+    assert_eq!(gate.residual_blockers[0].comment_id, "13");
+    assert_eq!(gate.candidate_blockers.len(), 1);
+    assert_eq!(gate.candidate_blockers[0].comment_id, "13");
+    assert_eq!(gate.duplicates_collapsed.len(), 1);
+    assert_eq!(gate.duplicates_collapsed[0].primary_comment_id, "13");
+    assert_eq!(
+        gate.duplicates_collapsed[0].duplicate_comment_ids,
+        vec![String::from("12")]
+    );
+}
+
+#[test]
 fn duplicate_detection_preserves_identical_text_in_separate_threads() {
     let mut scan = base_scan(
         "This can break the response contract in this PR because `partial` changes client handling.",

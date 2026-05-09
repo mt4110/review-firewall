@@ -1,4 +1,4 @@
-use crate::dedupe::collapse_duplicates;
+use crate::dedupe::collapse_duplicates_with_primary_filter;
 use crate::domain::CodeownerRule;
 use crate::domain::{
     BlockerConcern, ClassifiedComment, CommentRecord, CommentType, GateArtifact,
@@ -20,7 +20,10 @@ pub fn gate_scan(
         .map(|comment| classify_comment(comment, scan, config, codeowner_rules))
         .collect::<Vec<_>>();
 
-    let duplicates_collapsed = collapse_duplicates(&mut classified);
+    let duplicates_collapsed =
+        collapse_duplicates_with_primary_filter(&mut classified, |comment| {
+            !is_pr_author_comment(&comment.comment, scan)
+        });
     let candidate_blockers = classified
         .iter()
         .filter(|comment| {
