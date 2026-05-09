@@ -376,6 +376,8 @@ fn draft_reply_writes_error_artifacts_for_unreadable_gate_artifact() {
     assert!(draft_json.contains(r#""status": "ERROR""#));
     assert!(draft_json.contains("gate.json could not be read"));
     assert!(draft_md.contains("gate.json could not be read"));
+    assert!(draft_md.contains("could not complete blocker analysis"));
+    assert!(!draft_md.contains("does not think this blocks merge"));
 }
 
 #[test]

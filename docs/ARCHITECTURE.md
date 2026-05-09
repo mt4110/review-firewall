@@ -236,6 +236,7 @@ Output:
 
 Generate concise author replies.
 If local config is partial, the command status and reason reflect that instead of silently using defaults.
+If the gate artifact is missing or unreadable, the command writes `ERROR` draft artifacts that explain analysis could not complete and avoids making a merge-safety judgment.
 
 Output:
 

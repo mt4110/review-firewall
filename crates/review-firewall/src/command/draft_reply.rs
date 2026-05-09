@@ -47,7 +47,7 @@ fn gate_error_draft_artifact(reason: impl Into<String>) -> DraftReplyArtifact {
         reply_type: ReplyType::Decline,
         target_comment_id: None,
         body: format!(
-            "Thanks. I do not think this blocks merge for this PR.\nReason: {reason}\nIf needed, I can track it separately."
+            "I could not complete blocker analysis for this PR, so I cannot draft a safe review reply yet.\nReason: {reason}\nRun review-firewall gate and retry before posting a review response."
         ),
     }
 }
