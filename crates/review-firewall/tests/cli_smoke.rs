@@ -349,6 +349,54 @@ fn gate_writes_error_artifact_for_unreadable_scan_artifact() {
 }
 
 #[test]
+fn draft_reply_writes_error_artifacts_for_unreadable_gate_artifact() {
+    let repo = temp_dir("draft-corrupt-gate");
+    init_repo(&repo);
+    let gh_stub = install_gh_success_stub(&repo);
+
+    for args in [vec!["scan", "--pr", "42"], vec!["gate"]] {
+        let output = run_with_path(&repo, &gh_stub, &args);
+        assert!(output.status.success(), "command failed: {:?}", args);
+    }
+    let run_dir = latest_run_dir(&repo);
+    fs::write(run_dir.join("gate.json"), "{ not json\n").expect("corrupt gate");
+
+    let draft = run_with_path(&repo, &gh_stub, &["draft-reply"]);
+
+    assert!(draft.status.success());
+    let stdout = String::from_utf8_lossy(&draft.stdout);
+    assert!(stdout.contains("STATUS: ERROR"));
+    assert!(stdout.contains("gate.json could not be read"));
+    let draft_json = fs::read_to_string(run_dir.join("draft_reply.json")).expect("draft");
+    let draft_md = fs::read_to_string(run_dir.join("draft_reply.md")).expect("draft md");
+    assert!(draft_json.contains(r#""status": "ERROR""#));
+    assert!(draft_json.contains("gate.json could not be read"));
+    assert!(draft_md.contains("gate.json could not be read"));
+}
+
+#[test]
+fn escalate_writes_error_artifact_for_unreadable_scan_artifact() {
+    let repo = temp_dir("escalate-corrupt-scan");
+    init_repo(&repo);
+    let gh_stub = install_gh_success_stub(&repo);
+
+    let scan = run_with_path(&repo, &gh_stub, &["scan", "--pr", "42"]);
+    assert!(scan.status.success());
+    let run_dir = latest_run_dir(&repo);
+    fs::write(run_dir.join("scan.json"), "{ not json\n").expect("corrupt scan");
+
+    let escalate = run_with_path(&repo, &gh_stub, &["escalate"]);
+
+    assert!(escalate.status.success());
+    let stdout = String::from_utf8_lossy(&escalate.stdout);
+    assert!(stdout.contains("STATUS: ERROR"));
+    assert!(stdout.contains("scan.json could not be read"));
+    let escalation_md = fs::read_to_string(run_dir.join("escalation.md")).expect("escalation");
+    assert!(escalation_md.contains("STATUS: ERROR"));
+    assert!(escalation_md.contains("scan.json could not be read"));
+}
+
+#[test]
 fn report_names_missing_escalation_artifact_reason() {
     let repo = temp_dir("report-missing-escalation");
     init_repo(&repo);

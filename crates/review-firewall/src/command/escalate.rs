@@ -12,25 +12,31 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
     let repo_root = git::repo_root(cwd);
     let run = run_store::latest_or_create(&repo_root.path).map_err(io_error)?;
     let policy = config::load(&repo_root.path);
-    let scan =
-        artifacts::read_json::<ScanArtifact>(run.directory.join("scan.json")).map_err(io_error)?;
 
-    let (mut status, mut reason, pr_number, candidates) = if let Some(scan) = scan {
-        let candidates = evaluate_escalation_candidates(
-            &scan.review_threads,
-            policy.review.max_pr_thread_roundtrips,
-        );
-        (scan.status, scan.reason.clone(), scan.pr.number, candidates)
-    } else {
-        (
-            Status::Error,
-            Some(String::from(
-                "scan.json not found; run review-firewall scan first",
-            )),
-            None,
-            Vec::new(),
-        )
-    };
+    let (mut status, mut reason, pr_number, candidates) =
+        match artifacts::read_json::<ScanArtifact>(run.directory.join("scan.json")) {
+            Ok(Some(scan)) => {
+                let candidates = evaluate_escalation_candidates(
+                    &scan.review_threads,
+                    policy.review.max_pr_thread_roundtrips,
+                );
+                (scan.status, scan.reason.clone(), scan.pr.number, candidates)
+            }
+            Ok(None) => (
+                Status::Error,
+                Some(String::from(
+                    "scan.json not found; run review-firewall scan first",
+                )),
+                None,
+                Vec::new(),
+            ),
+            Err(error) => (
+                Status::Error,
+                Some(format!("scan.json could not be read: {error}")),
+                None,
+                Vec::new(),
+            ),
+        };
     merge_config_status(&mut status, &mut reason, &policy);
 
     let markdown = build_escalation_markdown(status, reason.as_deref(), pr_number, &candidates);

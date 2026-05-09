@@ -12,33 +12,56 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
     let repo_root = git::repo_root(cwd);
     let run = run_store::latest_or_create(&repo_root.path).map_err(io_error)?;
     let policy = config::load(&repo_root.path);
-    let gate =
-        artifacts::read_json::<GateArtifact>(run.directory.join("gate.json")).map_err(io_error)?;
+    let gate = match artifacts::read_json::<GateArtifact>(run.directory.join("gate.json")) {
+        Ok(gate) => gate,
+        Err(error) => {
+            let mut draft =
+                gate_error_draft_artifact(format!("gate.json could not be read: {error}"));
+            merge_config_status(&mut draft.status, &mut draft.reason, &policy);
+            write_draft_artifacts(&run, &draft)?;
+            return Ok(command_outcome(&draft));
+        }
+    };
 
     let draft = if let Some(gate) = gate {
         let mut draft = build_draft_reply(&gate, policy.reply.max_lines);
         merge_config_status(&mut draft.status, &mut draft.reason, &policy);
         draft
     } else {
-        let mut draft = DraftReplyArtifact {
-            status: Status::Error,
-            reason: Some(String::from(
-                "gate.json not found; run review-firewall gate first",
-            )),
-            reply_type: ReplyType::Decline,
-            target_comment_id: None,
-            body: String::from(
-                "Thanks. I do not think this blocks merge for this PR.\nReason: the current gate output is missing.\nIf needed, I can track it separately.",
-            ),
-        };
+        let mut draft =
+            gate_error_draft_artifact("gate.json not found; run review-firewall gate first");
         merge_config_status(&mut draft.status, &mut draft.reason, &policy);
         draft
     };
 
-    artifacts::write_json(run.directory.join("draft_reply.json"), &draft).map_err(io_error)?;
-    artifacts::write_text(run.directory.join("draft_reply.md"), &draft.body).map_err(io_error)?;
+    write_draft_artifacts(&run, &draft)?;
 
-    Ok(CommandOutcome {
+    Ok(command_outcome(&draft))
+}
+
+fn gate_error_draft_artifact(reason: impl Into<String>) -> DraftReplyArtifact {
+    let reason = reason.into();
+    DraftReplyArtifact {
+        status: Status::Error,
+        reason: Some(reason.clone()),
+        reply_type: ReplyType::Decline,
+        target_comment_id: None,
+        body: format!(
+            "Thanks. I do not think this blocks merge for this PR.\nReason: {reason}\nIf needed, I can track it separately."
+        ),
+    }
+}
+
+fn write_draft_artifacts(
+    run: &run_store::RunDirectory,
+    draft: &DraftReplyArtifact,
+) -> Result<(), String> {
+    artifacts::write_json(run.directory.join("draft_reply.json"), draft).map_err(io_error)?;
+    artifacts::write_text(run.directory.join("draft_reply.md"), &draft.body).map_err(io_error)
+}
+
+fn command_outcome(draft: &DraftReplyArtifact) -> CommandOutcome {
+    CommandOutcome {
         status: draft.status,
         reason: draft.reason.clone(),
         lines: vec![
@@ -52,7 +75,7 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
             ),
         ],
         next: None,
-    })
+    }
 }
 
 fn merge_config_status(
