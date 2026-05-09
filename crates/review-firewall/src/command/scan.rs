@@ -251,6 +251,39 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                         local_changed.reason,
                         Status::Partial,
                     );
+                } else {
+                    let head_check =
+                        local_head_matches_pr_head(&repo_root.path, pr.head_oid.as_deref());
+                    if head_check.reason.is_some() {
+                        partial_sources.push(String::from("changed_files"));
+                    }
+                    merge_probe_reason(
+                        &mut status,
+                        &mut reason,
+                        &mut warnings,
+                        head_check.reason,
+                        Status::Partial,
+                    );
+                    if head_check.value {
+                        let base_changed = git::changed_files_against_base(
+                            &repo_root.path,
+                            pr.base_branch.as_deref(),
+                        );
+                        if base_changed.reason.is_some() {
+                            partial_sources.push(String::from("changed_files"));
+                        }
+                        let base_reason = base_changed.reason.clone();
+                        let paths = base_changed.paths;
+                        merge_probe_reason(
+                            &mut status,
+                            &mut reason,
+                            &mut warnings,
+                            base_reason,
+                            Status::Partial,
+                        );
+                        changed_files =
+                            supplement_changed_files_from_base_diff(changed_files, paths, true);
+                    }
                 }
                 partial_sources.push(String::from("repository_identity"));
                 merge_probe_reason(
