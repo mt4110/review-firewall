@@ -57,21 +57,60 @@ fn parse_rule(line: &str) -> Option<CodeownerRule> {
     if trimmed.is_empty() || trimmed.starts_with('#') {
         return None;
     }
-    let tokens = trimmed.split_whitespace().collect::<Vec<_>>();
-    if tokens.len() < 2 {
+    let (pattern, owners_text) = split_pattern_and_owners(trimmed)?;
+    let owners = owners_text
+        .split_whitespace()
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+    if owners.is_empty() {
         return None;
     }
-    let owners = tokens[1..]
-        .iter()
-        .map(|value| (*value).to_owned())
-        .collect::<Vec<_>>();
     if !owners.iter().all(|owner| is_valid_owner(owner)) {
         return None;
     }
     Some(CodeownerRule {
-        pattern: normalize_path(tokens[0]),
+        pattern: normalize_path(&pattern),
         owners,
     })
+}
+
+fn split_pattern_and_owners(line: &str) -> Option<(String, &str)> {
+    let mut pattern = String::new();
+    let mut escaped = false;
+
+    for (index, character) in line.char_indices() {
+        if escaped {
+            if character.is_whitespace() {
+                pattern.push(character);
+            } else {
+                pattern.push('\\');
+                pattern.push(character);
+            }
+            escaped = false;
+            continue;
+        }
+
+        if character == '\\' {
+            escaped = true;
+            continue;
+        }
+
+        if character.is_whitespace() {
+            let owners = line[index..].trim();
+            if pattern.is_empty() || owners.is_empty() {
+                return None;
+            }
+            return Some((pattern, owners));
+        }
+
+        pattern.push(character);
+    }
+
+    if escaped {
+        pattern.push('\\');
+    }
+
+    None
 }
 
 fn is_valid_owner(owner: &str) -> bool {

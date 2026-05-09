@@ -97,6 +97,31 @@ fn codeowners_detection_reads_rules() {
 }
 
 #[test]
+fn codeowners_detection_preserves_escaped_spaces_in_patterns() {
+    let repo = temp_dir("codeowners-escaped-spaces");
+    fs::write(
+        repo.join("CODEOWNERS"),
+        "docs/my\\ file.md @docs-owner\nsrc/with\\ space/* @org/docs-team docs@example.com\n",
+    )
+    .expect("write root");
+
+    let loaded = io::codeowners::load(&repo);
+
+    assert!(loaded.found);
+    assert_eq!(loaded.rules.len(), 2);
+    assert_eq!(loaded.rules[0].pattern, "docs/my file.md");
+    assert_eq!(loaded.rules[0].owners, vec![String::from("@docs-owner")]);
+    assert_eq!(loaded.rules[1].pattern, "src/with space/*");
+    assert_eq!(
+        loaded.rules[1].owners,
+        vec![
+            String::from("@org/docs-team"),
+            String::from("docs@example.com")
+        ]
+    );
+}
+
+#[test]
 fn codeowners_detection_uses_root_then_docs_fallbacks() {
     let root_repo = temp_dir("codeowners-root");
     fs::write(root_repo.join("CODEOWNERS"), "/src/* @root-owner\n").expect("write root");
