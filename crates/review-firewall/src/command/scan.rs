@@ -17,7 +17,6 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
     let policy = config::load(&repo_root.path);
     let codeowners_file = codeowners::load(&repo_root.path);
     let branch = git::current_branch(&repo_root.path);
-    let repository = git::repository_identity(&repo_root.path);
 
     let mut status = Status::Ok;
     let mut reason = None::<String>;
@@ -64,6 +63,12 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
         Ok(pr_data) => {
             pr = build_pull_request_summary(&pr_data);
             changed_files = pr_changed_files(&pr_data);
+            let repository = repository_identity_from_pr_url(&pr_data)
+                .map(|identity| git::RepositoryProbe {
+                    identity: Some(identity),
+                    reason: None,
+                })
+                .unwrap_or_else(|| git::repository_identity(&repo_root.path));
 
             let local_changed = git::changed_files(&repo_root.path, pr.base_branch.as_deref());
             changed_files = merge_changed_files(changed_files, &local_changed.paths);
@@ -286,6 +291,34 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
             .scan_partial
             .then(|| String::from("scan_partial=true")),
     })
+}
+
+fn repository_identity_from_pr_url(value: &Value) -> Option<git::RepositoryIdentity> {
+    parse_pr_url_repository_identity(value.get("url").and_then(Value::as_str)?)
+}
+
+fn parse_pr_url_repository_identity(url: &str) -> Option<git::RepositoryIdentity> {
+    let (_, remainder) = url.split_once("://")?;
+    let (authority, path) = remainder.split_once('/')?;
+    let host = authority.split('@').next_back()?.split(':').next()?;
+    let mut parts = path.split('/').filter(|part| !part.is_empty());
+    let owner = parts.next()?;
+    let name = parts.next()?;
+    let marker = parts.next()?;
+    if host.is_empty() || owner.is_empty() || name.is_empty() || marker != "pull" {
+        return None;
+    }
+
+    Some(git::RepositoryIdentity {
+        host: host.to_owned(),
+        full_name: format!("{owner}/{name}"),
+    })
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn parse_pr_url_repository_identity_for_tests(url: &str) -> Option<git::RepositoryIdentity> {
+    parse_pr_url_repository_identity(url)
 }
 
 fn build_pull_request_summary(value: &Value) -> PullRequestSummary {

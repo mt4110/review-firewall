@@ -275,15 +275,6 @@ fn parse_github_remote(remote: &str) -> Option<RepositoryIdentity> {
     })
 }
 
-fn is_preferred_github_host(host: &str) -> bool {
-    let host = host.to_ascii_lowercase();
-    host == "github.com"
-        || host.starts_with("github.")
-        || host.starts_with("ghe.")
-        || host.contains(".github.")
-        || host.contains(".ghe.")
-}
-
 fn parse_repository_identity_from_remotes(output: &str) -> Option<RepositoryIdentity> {
     let remotes = output
         .lines()
@@ -308,13 +299,7 @@ fn find_remote_identity(
     remotes
         .iter()
         .filter(|remote| predicate(remote))
-        .filter_map(|remote| {
-            let identity = parse_github_remote(remote.url)?;
-            if !is_preferred_github_host(&identity.host) {
-                return None;
-            }
-            Some(identity)
-        })
+        .filter_map(|remote| parse_github_remote(remote.url))
         .next()
 }
 
