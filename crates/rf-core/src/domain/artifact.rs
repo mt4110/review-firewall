@@ -23,6 +23,8 @@ pub struct PullRequestSummary {
     pub base_branch: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub head_branch: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub head_oid: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub labels: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

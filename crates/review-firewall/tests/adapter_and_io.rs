@@ -492,6 +492,10 @@ fn scan_normalization_from_gh_fixture_preserves_expected_shape() {
 
     assert_eq!(pr.number, Some(142));
     assert_eq!(pr.title, "Refactor response handling");
+    assert_eq!(
+        pr.head_oid.as_deref(),
+        Some("0123456789abcdef0123456789abcdef01234567")
+    );
     assert_eq!(pr.review_decisions[0], "CHANGES_REQUESTED");
     assert_eq!(comments.len(), 2);
     assert_eq!(comments[0].path.as_deref(), Some("src/api/response.rs"));
@@ -575,16 +579,28 @@ fn scan_changed_files_use_local_diff_only_when_pr_files_are_unavailable() {
 }
 
 #[test]
-fn scan_changed_files_supplements_pr_file_list_with_local_diff_after_api_failure() {
+fn scan_changed_files_supplements_pr_file_list_with_local_diff_when_head_matches() {
     let recovered = command::scan::supplement_changed_files_from_base_diff_for_tests(
         vec![String::from("src/pr.rs")],
         vec![String::from("src/local.rs"), String::from("src/pr.rs")],
+        true,
     );
 
     assert_eq!(
         recovered,
         vec![String::from("src/pr.rs"), String::from("src/local.rs")]
     );
+}
+
+#[test]
+fn scan_changed_files_does_not_supplement_pr_file_list_when_head_mismatches() {
+    let kept = command::scan::supplement_changed_files_from_base_diff_for_tests(
+        vec![String::from("src/pr.rs")],
+        vec![String::from("src/local.rs")],
+        false,
+    );
+
+    assert_eq!(kept, vec![String::from("src/pr.rs")]);
 }
 
 #[test]

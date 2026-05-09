@@ -93,6 +93,7 @@ Recommended additional fields:
 - `repo_root`
 - `branch`
 - `base_branch`
+- `head_oid`
 - `labels`
 - `comments`
 - `issue_comments`

@@ -84,6 +84,29 @@ pub fn current_branch(repo_root: &Path) -> StringProbe {
     }
 }
 
+pub fn head_oid(repo_root: &Path) -> StringProbe {
+    let output = run_process(
+        repo_root,
+        "git",
+        &[String::from("rev-parse"), String::from("HEAD")],
+    );
+    if output.success {
+        StringProbe {
+            value: output.stdout.trim().to_owned(),
+            reason: None,
+        }
+    } else {
+        StringProbe {
+            value: String::new(),
+            reason: Some(
+                output
+                    .reason
+                    .unwrap_or_else(|| fallback_reason(output.stderr, "git HEAD lookup failed")),
+            ),
+        }
+    }
+}
+
 pub fn fallback_base_branch(repo_root: &Path) -> StringProbe {
     let origin_head = run_process(
         repo_root,

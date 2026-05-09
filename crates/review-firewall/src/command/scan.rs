@@ -11,6 +11,11 @@ use crate::adapter::{gh, git};
 use crate::command::CommandOutcome;
 use crate::io::{artifacts, codeowners, config, run_store};
 
+struct BoolProbe {
+    value: bool,
+    reason: Option<String>,
+}
+
 pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, String> {
     let repo_root = git::repo_root(cwd);
     let run = run_store::create_new(&repo_root.path).map_err(io_error)?;
@@ -109,20 +114,37 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
 
                 if changed_files.is_empty() || changed_files_partial {
                     changed_files = if changed_files_partial {
-                        let base_changed = git::changed_files_against_base(
-                            &repo_root.path,
-                            pr.base_branch.as_deref(),
-                        );
-                        let base_reason = base_changed.reason.clone();
-                        let paths = base_changed.paths;
+                        let head_check =
+                            local_head_matches_pr_head(&repo_root.path, pr.head_oid.as_deref());
                         merge_probe_reason(
                             &mut status,
                             &mut reason,
                             &mut warnings,
-                            base_reason,
+                            head_check.reason,
                             Status::Partial,
                         );
-                        supplement_changed_files_from_base_diff(changed_files, paths)
+                        if head_check.value {
+                            let base_changed = git::changed_files_against_base(
+                                &repo_root.path,
+                                pr.base_branch.as_deref(),
+                            );
+                            let base_reason = base_changed.reason.clone();
+                            let paths = base_changed.paths;
+                            merge_probe_reason(
+                                &mut status,
+                                &mut reason,
+                                &mut warnings,
+                                base_reason,
+                                Status::Partial,
+                            );
+                            supplement_changed_files_from_base_diff(changed_files, paths, true)
+                        } else {
+                            supplement_changed_files_from_base_diff(
+                                changed_files,
+                                Vec::new(),
+                                false,
+                            )
+                        }
                     } else {
                         let local_changed =
                             git::changed_files(&repo_root.path, pr.base_branch.as_deref());
@@ -405,6 +427,10 @@ fn build_pull_request_summary(value: &Value) -> PullRequestSummary {
             .get("headRefName")
             .and_then(Value::as_str)
             .map(ToOwned::to_owned),
+        head_oid: value
+            .get("headRefOid")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
         labels: value
             .get("labels")
             .and_then(Value::as_array)
@@ -466,8 +492,52 @@ fn fallback_changed_files_from_local(primary: Vec<String>, local: Vec<String>) -
 fn supplement_changed_files_from_base_diff(
     primary: Vec<String>,
     base_diff: Vec<String>,
+    local_head_matches_pr_head: bool,
 ) -> Vec<String> {
-    merge_changed_files(primary, &base_diff)
+    if local_head_matches_pr_head {
+        merge_changed_files(primary, &base_diff)
+    } else {
+        primary
+    }
+}
+
+fn local_head_matches_pr_head(repo_root: &Path, pr_head_oid: Option<&str>) -> BoolProbe {
+    let Some(pr_head_oid) = pr_head_oid.map(str::trim).filter(|value| !value.is_empty()) else {
+        return BoolProbe {
+            value: false,
+            reason: Some(String::from(
+                "Skipped local changed-file supplementation because PR head OID is unknown",
+            )),
+        };
+    };
+
+    let local_head = git::head_oid(repo_root);
+    if let Some(reason) = local_head.reason {
+        return BoolProbe {
+            value: false,
+            reason: Some(reason),
+        };
+    }
+
+    if local_head.value.eq_ignore_ascii_case(pr_head_oid) {
+        BoolProbe {
+            value: true,
+            reason: None,
+        }
+    } else {
+        BoolProbe {
+            value: false,
+            reason: Some(format!(
+                "Skipped local changed-file supplementation because local HEAD {} does not match PR head {}",
+                short_oid(&local_head.value),
+                short_oid(pr_head_oid)
+            )),
+        }
+    }
+}
+
+fn short_oid(value: &str) -> String {
+    value.chars().take(12).collect()
 }
 
 #[cfg(test)]
@@ -490,8 +560,9 @@ pub fn fallback_changed_files_from_local_for_tests(
 pub fn supplement_changed_files_from_base_diff_for_tests(
     primary: Vec<String>,
     base_diff: Vec<String>,
+    local_head_matches_pr_head: bool,
 ) -> Vec<String> {
-    supplement_changed_files_from_base_diff(primary, base_diff)
+    supplement_changed_files_from_base_diff(primary, base_diff, local_head_matches_pr_head)
 }
 
 #[cfg(test)]

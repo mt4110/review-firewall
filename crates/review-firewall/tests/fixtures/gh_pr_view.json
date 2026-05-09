@@ -5,6 +5,7 @@
   "author": { "login": "author" },
   "baseRefName": "main",
   "headRefName": "feature/test",
+  "headRefOid": "0123456789abcdef0123456789abcdef01234567",
   "labels": [{ "name": "api" }, { "name": "correctness" }],
   "reviewDecision": "CHANGES_REQUESTED",
   "files": [{ "path": "src/api/response.rs" }],

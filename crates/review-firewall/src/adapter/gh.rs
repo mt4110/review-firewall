@@ -18,6 +18,7 @@ pub fn pr_view(repo_root: &Path, pr_number: Option<u64>) -> Result<Value, String
         "author",
         "baseRefName",
         "headRefName",
+        "headRefOid",
         "labels",
         "reviewDecision",
         "files",
