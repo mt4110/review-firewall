@@ -186,16 +186,22 @@ fn codeowners_detection_prefers_github_directory() {
 }
 
 #[test]
-fn codeowners_detection_ignores_entries_without_owners() {
+fn codeowners_detection_preserves_empty_owner_override_entries() {
     let repo = temp_dir("codeowners-ownerless");
-    fs::write(repo.join("CODEOWNERS"), "/apps/ @platform\n/apps/github\n").expect("write root");
+    fs::write(
+        repo.join("CODEOWNERS"),
+        "/apps/ @platform\n/apps/github # intentionally ownerless\n",
+    )
+    .expect("write root");
 
     let loaded = io::codeowners::load(&repo);
 
     assert!(loaded.found);
-    assert_eq!(loaded.rules.len(), 1);
+    assert_eq!(loaded.rules.len(), 2);
     assert_eq!(loaded.rules[0].pattern, "/apps/");
     assert_eq!(loaded.rules[0].owners, vec![String::from("@platform")]);
+    assert_eq!(loaded.rules[1].pattern, "/apps/github");
+    assert!(loaded.rules[1].owners.is_empty());
 }
 
 #[test]
@@ -203,7 +209,7 @@ fn codeowners_detection_ignores_inline_comments_and_invalid_owner_lines() {
     let repo = temp_dir("codeowners-comments-invalid");
     fs::write(
         repo.join("CODEOWNERS"),
-        "/apps/* @platform # app owners\n/apps/github reviewer\n/web/* @org/web-team extra-owner\n/docs/* docs@example.com # docs owners\n/internal\n",
+        "/apps/* @platform # app owners\n/apps/github reviewer\n/web/* @org/web-team extra-owner\n/docs/* docs@example.com # docs owners\n",
     )
     .expect("write root");
 

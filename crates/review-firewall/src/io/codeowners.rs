@@ -59,9 +59,6 @@ fn parse_rule(line: &str) -> Option<CodeownerRule> {
         .take_while(|value| !value.starts_with('#'))
         .map(ToOwned::to_owned)
         .collect::<Vec<_>>();
-    if owners.is_empty() {
-        return None;
-    }
     if !owners.iter().all(|owner| is_valid_owner(owner)) {
         return None;
     }
@@ -94,7 +91,7 @@ fn split_pattern_and_owners(line: &str) -> Option<(String, &str)> {
 
         if character.is_whitespace() {
             let owners = line[index..].trim();
-            if pattern.is_empty() || owners.is_empty() {
+            if pattern.is_empty() {
                 return None;
             }
             return Some((pattern, owners));
@@ -107,7 +104,11 @@ fn split_pattern_and_owners(line: &str) -> Option<(String, &str)> {
         pattern.push('\\');
     }
 
-    None
+    if pattern.is_empty() {
+        None
+    } else {
+        Some((pattern, ""))
+    }
 }
 
 fn is_valid_owner(owner: &str) -> bool {

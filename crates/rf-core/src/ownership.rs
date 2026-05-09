@@ -62,9 +62,6 @@ pub fn find_matching_rule<'a>(
     let normalized_path = normalize_path(candidate_path);
     let mut matched = None;
     for rule in rules {
-        if rule.owners.is_empty() {
-            continue;
-        }
         if codeowner_pattern_matches(&rule.pattern, &normalized_path) {
             matched = Some(rule);
         }
@@ -245,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_owner_rule_does_not_override_broader_match() {
+    fn empty_owner_rule_overrides_broader_match() {
         let advisory = build_ownership_advisory(
             "alice",
             Some("apps/github/main.rs"),
@@ -263,8 +260,8 @@ mod tests {
             true,
         );
 
-        assert!(advisory.owner_match);
-        assert_eq!(format!("{:?}", advisory.ownership_scope), "Exact");
+        assert!(!advisory.owner_match);
+        assert_eq!(format!("{:?}", advisory.ownership_scope), "None");
     }
 
     #[test]
