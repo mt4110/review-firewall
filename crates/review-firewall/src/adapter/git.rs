@@ -184,23 +184,17 @@ pub fn changed_files(repo_root: &Path, base_branch: Option<&str>) -> PathsProbe 
     let mut base_diff_failed_reasons = Vec::new();
     let mut base_diff_succeeded = false;
     if let Some(base_branch) = base_branch.filter(|value| !value.trim().is_empty()) {
-        let base_attempts = vec![
-            vec![
+        for reference in [format!("origin/{base_branch}"), base_branch.to_owned()] {
+            let attempt = vec![
                 String::from("diff"),
                 String::from("--name-only"),
-                format!("origin/{base_branch}...HEAD"),
-            ],
-            vec![
-                String::from("diff"),
-                String::from("--name-only"),
-                format!("{base_branch}...HEAD"),
-            ],
-        ];
-        for attempt in base_attempts {
+                format!("{reference}...HEAD"),
+            ];
             let output = run_process(repo_root, "git", &attempt);
             if output.success {
                 base_diff_succeeded = true;
                 merge_paths(&mut paths, parse_changed_paths(&output.stdout));
+                break;
             } else {
                 base_diff_failed_reasons.push(
                     output

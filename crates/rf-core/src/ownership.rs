@@ -74,8 +74,15 @@ pub fn find_matching_rule<'a>(
 
 fn owner_matches(owner: &str, reviewer: &str) -> bool {
     let normalized_owner = owner.trim().to_ascii_lowercase();
-    let normalized_reviewer = reviewer.trim().to_ascii_lowercase();
-    normalized_owner == normalized_reviewer || normalized_owner == format!("@{normalized_reviewer}")
+    let normalized_reviewer = reviewer.trim().trim_start_matches('@').to_ascii_lowercase();
+    let owner_without_at = normalized_owner.trim_start_matches('@');
+
+    normalized_owner == normalized_reviewer
+        || owner_without_at == normalized_reviewer
+        || owner_without_at
+            .split_once('/')
+            .map(|(_, team_slug)| team_slug == normalized_reviewer)
+            .unwrap_or(false)
 }
 
 fn codeowner_pattern_matches(pattern: &str, candidate_path: &str) -> bool {
@@ -206,6 +213,40 @@ mod tests {
             true,
         );
         assert!(advisory.owner_match);
+    }
+
+    #[test]
+    fn team_owner_matches_reviewer_team_slug() {
+        let advisory = build_ownership_advisory(
+            "platform",
+            Some("src/api.rs"),
+            &[String::from("src/api.rs")],
+            &[CodeownerRule {
+                pattern: "/src/*".into(),
+                owners: vec!["@example/platform".into()],
+            }],
+            true,
+        );
+
+        assert!(advisory.owner_match);
+        assert_eq!(format!("{:?}", advisory.ownership_scope), "Exact");
+    }
+
+    #[test]
+    fn team_owner_matches_full_team_reviewer() {
+        let advisory = build_ownership_advisory(
+            "@example/platform",
+            Some("src/api.rs"),
+            &[String::from("src/api.rs")],
+            &[CodeownerRule {
+                pattern: "/src/*".into(),
+                owners: vec!["@example/platform".into()],
+            }],
+            true,
+        );
+
+        assert!(advisory.owner_match);
+        assert_eq!(format!("{:?}", advisory.ownership_scope), "Exact");
     }
 
     #[test]

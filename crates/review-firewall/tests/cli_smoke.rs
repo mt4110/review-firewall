@@ -327,6 +327,40 @@ fn report_preserves_error_status_when_upstream_artifact_is_missing() {
 }
 
 #[test]
+fn report_names_missing_escalation_artifact_reason() {
+    let repo = temp_dir("report-missing-escalation");
+    init_repo(&repo);
+    let gh_stub = install_gh_success_stub(&repo);
+
+    for args in [
+        vec!["scan", "--pr", "42"],
+        vec!["gate"],
+        vec!["draft-reply"],
+    ] {
+        let output = run_with_path(&repo, &gh_stub, &args);
+        assert!(
+            output.status.success(),
+            "command failed: {:?}\nstdout={}\nstderr={}",
+            args,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let run_dir = latest_run_dir(&repo);
+    let report = run_with_path(&repo, &gh_stub, &["report"]);
+
+    assert!(report.status.success());
+    let stdout = String::from_utf8_lossy(&report.stdout);
+    assert!(stdout.contains("STATUS: PARTIAL"));
+    assert!(stdout.contains("escalation.md not found; run review-firewall escalate first"));
+    assert!(!stdout.contains("escalation.md is missing STATUS"));
+    let report_md = fs::read_to_string(run_dir.join("report.md")).expect("report");
+    assert!(report_md.contains("escalation.md not found; run review-firewall escalate first"));
+    assert!(!report_md.contains("escalation.md is missing STATUS"));
+}
+
+#[test]
 fn report_writes_error_artifact_for_unreadable_upstream_artifact() {
     let repo = temp_dir("report-corrupt-upstream");
     init_repo(&repo);

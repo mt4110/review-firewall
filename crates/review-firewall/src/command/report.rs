@@ -182,7 +182,7 @@ fn report_status_and_reason(
         .and_then(markdown_status)
         .unwrap_or(Status::Partial);
     let escalation_reason = escalation.and_then(markdown_reason).or_else(|| {
-        if escalation.and_then(markdown_status).is_none() {
+        if escalation.is_some() && escalation.and_then(markdown_status).is_none() {
             Some(String::from("escalation.md is missing STATUS"))
         } else {
             None

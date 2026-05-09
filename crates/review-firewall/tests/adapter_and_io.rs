@@ -252,6 +252,32 @@ fn git_changed_files_merges_worktree_status_with_base_diff() {
 }
 
 #[test]
+fn git_changed_files_prefers_origin_base_over_stale_local_base() {
+    let repo = temp_dir("changed-files-origin-base");
+    run_git(&repo, &["init", "--initial-branch=main"]);
+    run_git(&repo, &["config", "user.email", "review-bot@example.com"]);
+    run_git(&repo, &["config", "user.name", "Review Bot"]);
+    fs::write(repo.join("base.rs"), "base\n").expect("write base");
+    run_git(&repo, &["add", "base.rs"]);
+    run_git(&repo, &["commit", "-m", "base"]);
+    run_git(&repo, &["checkout", "-b", "remote-main"]);
+    fs::write(repo.join("upstream.rs"), "upstream\n").expect("write upstream");
+    run_git(&repo, &["add", "upstream.rs"]);
+    run_git(&repo, &["commit", "-m", "upstream"]);
+    run_git(&repo, &["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    run_git(&repo, &["checkout", "main"]);
+    run_git(&repo, &["checkout", "-b", "feature", "origin/main"]);
+    fs::write(repo.join("pr.rs"), "pr\n").expect("write pr");
+    run_git(&repo, &["add", "pr.rs"]);
+    run_git(&repo, &["commit", "-m", "pr"]);
+
+    let changed = adapter::git::changed_files(&repo, Some("main"));
+
+    assert_eq!(changed.paths, vec![String::from("pr.rs")]);
+    assert!(changed.reason.is_none());
+}
+
+#[test]
 fn git_changed_files_surfaces_missing_base_diff_failure() {
     let repo = temp_dir("changed-files-missing-base");
     run_git(&repo, &["init", "--initial-branch=main"]);
