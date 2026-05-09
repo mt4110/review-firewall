@@ -1,7 +1,25 @@
-use crate::domain::{DraftReplyArtifact, GateArtifact, ReplyType};
+use crate::domain::{DraftReplyArtifact, GateArtifact, ReplyType, Status};
 
 pub fn build_draft_reply(gate: &GateArtifact, max_lines: usize) -> DraftReplyArtifact {
     let max_lines = max_lines.max(1);
+
+    if gate.status == Status::Error {
+        return DraftReplyArtifact {
+            status: gate.status,
+            reason: gate.reason.clone(),
+            reply_type: ReplyType::Decline,
+            target_comment_id: None,
+            body: limit_lines(
+                &format!(
+                    "I could not complete blocker analysis for this PR, so I cannot draft a safe review reply yet.\nReason: {}\nRerun review-firewall scan and gate before posting a review response.",
+                    gate.reason
+                        .as_deref()
+                        .unwrap_or("gate analysis did not complete successfully")
+                ),
+                max_lines,
+            ),
+        };
+    }
 
     if let Some(blocker) = gate.residual_blockers.first() {
         let action = blocker

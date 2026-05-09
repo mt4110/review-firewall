@@ -353,6 +353,30 @@ fn gate_writes_error_artifact_for_unreadable_scan_artifact() {
 }
 
 #[test]
+fn draft_reply_avoids_merge_judgment_for_error_gate_artifact() {
+    let repo = temp_dir("draft-error-gate");
+    init_repo(&repo);
+    let gh_stub = install_gh_success_stub(&repo);
+
+    let scan = run_with_path(&repo, &gh_stub, &["scan", "--pr", "42"]);
+    assert!(scan.status.success());
+    let run_dir = latest_run_dir(&repo);
+    fs::write(run_dir.join("scan.json"), "{ not json\n").expect("corrupt scan");
+    let gate = run_with_path(&repo, &gh_stub, &["gate"]);
+    assert!(gate.status.success());
+
+    let draft = run_with_path(&repo, &gh_stub, &["draft-reply"]);
+
+    assert!(draft.status.success());
+    let stdout = String::from_utf8_lossy(&draft.stdout);
+    assert!(stdout.contains("STATUS: ERROR"));
+    let draft_md = fs::read_to_string(run_dir.join("draft_reply.md")).expect("draft md");
+    assert!(draft_md.contains("could not complete blocker analysis"));
+    assert!(draft_md.contains("scan.json could not be read"));
+    assert!(!draft_md.contains("does not think this blocks merge"));
+}
+
+#[test]
 fn draft_reply_writes_error_artifacts_for_unreadable_gate_artifact() {
     let repo = temp_dir("draft-corrupt-gate");
     init_repo(&repo);

@@ -41,6 +41,33 @@ fn draft_reply_respects_max_lines() {
 }
 
 #[test]
+fn draft_reply_avoids_merge_judgment_when_gate_is_error() {
+    let gate = GateArtifact {
+        status: Status::Error,
+        reason: Some(String::from("scan.json could not be read")),
+        comments_analyzed: 0,
+        residual_blockers: Vec::new(),
+        counts: GateCounts::default(),
+        candidate_blockers: Vec::new(),
+        downgraded_comments: Vec::new(),
+        duplicates_collapsed: Vec::new(),
+        warnings: Vec::new(),
+        config_snapshot: GateConfigSnapshot::default(),
+        classified_comments: Vec::new(),
+        escalation_candidates: Vec::new(),
+    };
+
+    let draft = build_draft_reply(&gate, 3);
+
+    assert_eq!(draft.status, Status::Error);
+    assert_eq!(draft.reply_type, ReplyType::Decline);
+    assert!(draft.target_comment_id.is_none());
+    assert!(draft.body.contains("could not complete blocker analysis"));
+    assert!(draft.body.contains("scan.json could not be read"));
+    assert!(!draft.body.contains("does not think this blocks merge"));
+}
+
+#[test]
 fn report_contains_required_sections() {
     let gate = GateArtifact {
         status: Status::Ok,
