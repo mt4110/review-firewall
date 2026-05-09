@@ -539,14 +539,26 @@ fn scan_repository_identity_uses_pr_url_host() {
 }
 
 #[test]
-fn scan_repository_identity_preserves_pr_url_port() {
+fn scan_repository_identity_drops_pr_url_port_for_gh_hostname() {
     let parsed = command::scan::parse_pr_url_repository_identity_for_tests(
         "https://gh.example.com:8443/example/review-firewall/pull/42",
     )
     .expect("parsed pr url");
 
-    assert_eq!(parsed.host, "gh.example.com:8443");
+    assert_eq!(parsed.host, "gh.example.com");
     assert_eq!(parsed.full_name, "example/review-firewall");
+}
+
+#[test]
+fn gh_hostname_drops_port_before_passing_hostname_flag() {
+    assert_eq!(
+        adapter::gh::gh_hostname_for_tests("gh.example.com:8443"),
+        "gh.example.com"
+    );
+    assert_eq!(
+        adapter::gh::gh_hostname_for_tests("github.com"),
+        "github.com"
+    );
 }
 
 #[test]

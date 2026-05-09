@@ -103,13 +103,31 @@ fn paged_array(
             "repos/{repository_full_name}/{resource}/{pr_number}/{suffix}?per_page=100&page={page}"
         );
         let mut args = vec![String::from("api")];
-        if repository_host != "github.com" {
+        let hostname = gh_hostname(repository_host);
+        if hostname != "github.com" {
             args.push(String::from("--hostname"));
-            args.push(repository_host.to_owned());
+            args.push(hostname.to_owned());
         }
         args.push(endpoint);
         parse_json_output(repo_root, &args, fallback)
     })
+}
+
+fn gh_hostname(repository_host: &str) -> &str {
+    let repository_host = repository_host.trim();
+    if repository_host.starts_with('[') {
+        return repository_host;
+    }
+    repository_host
+        .split_once(':')
+        .map(|(host, _)| host)
+        .unwrap_or(repository_host)
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn gh_hostname_for_tests(repository_host: &str) -> &str {
+    gh_hostname(repository_host)
 }
 
 fn collect_paged_arrays<F>(mut fetch_page: F) -> Result<ValuesProbe, String>

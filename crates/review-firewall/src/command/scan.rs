@@ -331,7 +331,8 @@ fn repository_identity_from_pr_url(value: &Value) -> Option<git::RepositoryIdent
 fn parse_pr_url_repository_identity(url: &str) -> Option<git::RepositoryIdentity> {
     let (_, remainder) = url.split_once("://")?;
     let (authority, path) = remainder.split_once('/')?;
-    let host = authority.rsplit('@').next().unwrap_or(authority);
+    let authority_host = authority.rsplit('@').next().unwrap_or(authority);
+    let host = authority_host_without_port(authority_host);
     let mut parts = path.split('/').filter(|part| !part.is_empty());
     let owner = parts.next()?;
     let name = parts.next()?;
@@ -344,6 +345,13 @@ fn parse_pr_url_repository_identity(url: &str) -> Option<git::RepositoryIdentity
         host: host.to_owned(),
         full_name: format!("{owner}/{name}"),
     })
+}
+
+fn authority_host_without_port(host: &str) -> &str {
+    if host.starts_with('[') {
+        return host;
+    }
+    host.split_once(':').map(|(host, _)| host).unwrap_or(host)
 }
 
 #[cfg(test)]
