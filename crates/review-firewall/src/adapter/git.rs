@@ -289,32 +289,20 @@ fn parse_repository_identity_from_remotes(output: &str) -> Option<RepositoryIden
         .lines()
         .filter_map(parse_remote_listing)
         .collect::<Vec<_>>();
-    find_repository_identity(&remotes, true).or_else(|| find_repository_identity(&remotes, false))
+    find_repository_identity(&remotes)
 }
 
-fn find_repository_identity(
-    remotes: &[RemoteListing<'_>],
-    preferred_github_host_only: bool,
-) -> Option<RepositoryIdentity> {
-    find_remote_identity(remotes, preferred_github_host_only, |remote| {
+fn find_repository_identity(remotes: &[RemoteListing<'_>]) -> Option<RepositoryIdentity> {
+    find_remote_identity(remotes, |remote| {
         remote.name == "origin" && remote.direction == "(fetch)"
     })
-    .or_else(|| {
-        find_remote_identity(remotes, preferred_github_host_only, |remote| {
-            remote.name == "origin"
-        })
-    })
-    .or_else(|| {
-        find_remote_identity(remotes, preferred_github_host_only, |remote| {
-            remote.direction == "(fetch)"
-        })
-    })
-    .or_else(|| find_remote_identity(remotes, preferred_github_host_only, |_| true))
+    .or_else(|| find_remote_identity(remotes, |remote| remote.name == "origin"))
+    .or_else(|| find_remote_identity(remotes, |remote| remote.direction == "(fetch)"))
+    .or_else(|| find_remote_identity(remotes, |_| true))
 }
 
 fn find_remote_identity(
     remotes: &[RemoteListing<'_>],
-    preferred_github_host_only: bool,
     predicate: impl Fn(&RemoteListing<'_>) -> bool,
 ) -> Option<RepositoryIdentity> {
     remotes
@@ -322,7 +310,7 @@ fn find_remote_identity(
         .filter(|remote| predicate(remote))
         .filter_map(|remote| {
             let identity = parse_github_remote(remote.url)?;
-            if preferred_github_host_only && !is_preferred_github_host(&identity.host) {
+            if !is_preferred_github_host(&identity.host) {
                 return None;
             }
             Some(identity)

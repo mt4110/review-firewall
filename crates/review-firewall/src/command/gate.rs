@@ -10,8 +10,14 @@ use crate::io::{artifacts, codeowners, config, run_store};
 pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
     let repo_root = git::repo_root(cwd);
     let run = run_store::latest_or_create(&repo_root.path).map_err(io_error)?;
-    let scan =
-        artifacts::read_json::<ScanArtifact>(run.directory.join("scan.json")).map_err(io_error)?;
+    let scan = match artifacts::read_json::<ScanArtifact>(run.directory.join("scan.json")) {
+        Ok(scan) => scan,
+        Err(error) => {
+            let mut artifact = error_gate_artifact(format!("scan.json could not be read: {error}"));
+            artifacts::write_json(run.directory.join("gate.json"), &artifact).map_err(io_error)?;
+            return Ok(command_outcome(&mut artifact));
+        }
+    };
 
     let mut artifact = if let Some(scan) = scan {
         let policy = config::load(&repo_root.path);
@@ -31,6 +37,10 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
 
     artifacts::write_json(run.directory.join("gate.json"), &artifact).map_err(io_error)?;
 
+    Ok(command_outcome(&mut artifact))
+}
+
+fn command_outcome(artifact: &mut GateArtifact) -> CommandOutcome {
     let mut lines = vec![
         format!("Comments analyzed: {}", artifact.comments_analyzed),
         format!("Residual blockers: {}", artifact.residual_blockers.len()),
@@ -48,20 +58,22 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
         ));
     }
 
-    Ok(CommandOutcome {
+    CommandOutcome {
         status: artifact.status,
         reason: artifact.reason.take(),
         lines,
         next: None,
-    })
+    }
 }
 
 fn missing_gate_artifact() -> GateArtifact {
+    error_gate_artifact("scan.json not found; run review-firewall scan first")
+}
+
+fn error_gate_artifact(reason: impl Into<String>) -> GateArtifact {
     GateArtifact {
         status: Status::Error,
-        reason: Some(String::from(
-            "scan.json not found; run review-firewall scan first",
-        )),
+        reason: Some(reason.into()),
         comments_analyzed: 0,
         residual_blockers: Vec::new(),
         counts: Default::default(),

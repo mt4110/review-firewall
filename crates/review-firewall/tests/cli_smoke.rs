@@ -327,6 +327,28 @@ fn report_preserves_error_status_when_upstream_artifact_is_missing() {
 }
 
 #[test]
+fn gate_writes_error_artifact_for_unreadable_scan_artifact() {
+    let repo = temp_dir("gate-corrupt-scan");
+    init_repo(&repo);
+    let gh_stub = install_gh_success_stub(&repo);
+
+    let scan = run_with_path(&repo, &gh_stub, &["scan", "--pr", "42"]);
+    assert!(scan.status.success());
+    let run_dir = latest_run_dir(&repo);
+    fs::write(run_dir.join("scan.json"), "{ not json\n").expect("corrupt scan");
+
+    let gate = run_with_path(&repo, &gh_stub, &["gate"]);
+
+    assert!(gate.status.success());
+    let stdout = String::from_utf8_lossy(&gate.stdout);
+    assert!(stdout.contains("STATUS: ERROR"));
+    assert!(stdout.contains("scan.json could not be read"));
+    let gate_json = fs::read_to_string(run_dir.join("gate.json")).expect("gate");
+    assert!(gate_json.contains(r#""status": "ERROR""#));
+    assert!(gate_json.contains("scan.json could not be read"));
+}
+
+#[test]
 fn report_names_missing_escalation_artifact_reason() {
     let repo = temp_dir("report-missing-escalation");
     init_repo(&repo);

@@ -396,14 +396,12 @@ fn git_remote_parser_skips_non_github_origin_for_github_remote() {
 }
 
 #[test]
-fn git_remote_parser_falls_back_to_arbitrary_enterprise_hosts() {
+fn git_remote_parser_rejects_non_github_compatible_fallback_hosts() {
     let parsed = adapter::git::parse_repository_identity_from_remotes_for_tests(
-        "origin\tgit@enterprise.internal:example/review-firewall.git (fetch)\norigin\tgit@enterprise.internal:example/review-firewall.git (push)\n",
-    )
-    .expect("parsed enterprise remote");
+        "origin\twork:example/review-firewall.git (fetch)\norigin\twork:example/review-firewall.git (push)\n",
+    );
 
-    assert_eq!(parsed.host, "enterprise.internal");
-    assert_eq!(parsed.full_name, "example/review-firewall");
+    assert!(parsed.is_none());
 }
 
 #[test]

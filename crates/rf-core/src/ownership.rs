@@ -77,12 +77,7 @@ fn owner_matches(owner: &str, reviewer: &str) -> bool {
     let normalized_reviewer = reviewer.trim().trim_start_matches('@').to_ascii_lowercase();
     let owner_without_at = normalized_owner.trim_start_matches('@');
 
-    normalized_owner == normalized_reviewer
-        || owner_without_at == normalized_reviewer
-        || owner_without_at
-            .split_once('/')
-            .map(|(_, team_slug)| team_slug == normalized_reviewer)
-            .unwrap_or(false)
+    normalized_owner == normalized_reviewer || owner_without_at == normalized_reviewer
 }
 
 fn codeowner_pattern_matches(pattern: &str, candidate_path: &str) -> bool {
@@ -216,7 +211,7 @@ mod tests {
     }
 
     #[test]
-    fn team_owner_matches_reviewer_team_slug() {
+    fn team_owner_does_not_match_bare_reviewer_login() {
         let advisory = build_ownership_advisory(
             "platform",
             Some("src/api.rs"),
@@ -228,8 +223,8 @@ mod tests {
             true,
         );
 
-        assert!(advisory.owner_match);
-        assert_eq!(format!("{:?}", advisory.ownership_scope), "Exact");
+        assert!(!advisory.owner_match);
+        assert_eq!(format!("{:?}", advisory.ownership_scope), "None");
     }
 
     #[test]
