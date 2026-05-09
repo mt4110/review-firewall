@@ -668,6 +668,21 @@ fn contains_scope_marker(text: &str, markers: &[&str]) -> bool {
     })
 }
 
+fn starts_with_any_ascii_marker(text: &str, markers: &[&str]) -> bool {
+    markers
+        .iter()
+        .any(|marker| starts_with_ascii_marker(text, marker))
+}
+
+fn starts_with_ascii_marker(text: &str, marker: &str) -> bool {
+    text.strip_prefix(marker).is_some_and(|remaining| {
+        remaining
+            .bytes()
+            .next()
+            .is_none_or(|byte| !is_ascii_word_byte(byte))
+    })
+}
+
 fn contains_ascii_marker(text: &str, marker: &str) -> bool {
     text.match_indices(marker).any(|(index, _)| {
         let bytes = text.as_bytes();
@@ -750,20 +765,16 @@ fn is_nit(body: &str) -> bool {
 fn is_question(body: &str) -> bool {
     let lower = normalize_body(body);
     body.contains('?')
+        || starts_with_any_ascii_marker(
+            &lower,
+            &[
+                "why", "how", "what", "when", "where", "can", "could", "would", "is", "are",
+                "should",
+            ],
+        )
         || contains_any(
             &lower,
             &[
-                "why ",
-                "how ",
-                "what ",
-                "when ",
-                "where ",
-                "can ",
-                "could ",
-                "would ",
-                "is ",
-                "are ",
-                "should ",
                 "ですか",
                 "ますか",
                 "でしょうか",
@@ -859,8 +870,8 @@ fn dedupe_strings(values: Vec<String>) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use crate::domain::{
-        BlockerConcern, CommentRecord, CommentSource, GateConfigSnapshot, PullRequestSummary,
-        ScanArtifact, Status,
+        BlockerConcern, CommentRecord, CommentSource, CommentType, GateConfigSnapshot,
+        PullRequestSummary, ScanArtifact, Status,
     };
 
     use super::{extract_concern, gate_scan};
@@ -955,11 +966,75 @@ mod tests {
     }
 
     #[test]
+    fn question_markers_do_not_match_inside_statement_words() {
+        let scan = scan_with_comment_body("This public API behavior is confusing here.");
+
+        let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+        assert_eq!(gate.counts.questions, 0);
+        assert_eq!(gate.counts.suggestions, 1);
+        assert_eq!(
+            gate.classified_comments[0].comment_type,
+            CommentType::Suggestion
+        );
+    }
+
+    #[test]
+    fn question_markers_match_question_openers_without_question_mark() {
+        let scan = scan_with_comment_body("Is this public API behavior intentional");
+
+        let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+        assert_eq!(gate.counts.questions, 1);
+        assert_eq!(
+            gate.classified_comments[0].comment_type,
+            CommentType::Question
+        );
+    }
+
+    #[test]
     fn concern_keywords_use_word_boundaries_for_short_ascii_tokens() {
         assert_eq!(extract_concern("This capability label is confusing."), None);
         assert_eq!(
             extract_concern("The public API contract changes here."),
             Some(BlockerConcern::Api)
         );
+    }
+
+    fn scan_with_comment_body(body: &str) -> ScanArtifact {
+        ScanArtifact {
+            status: Status::Ok,
+            reason: None,
+            scan_partial: false,
+            repo_root: Some(String::from("/tmp/review-firewall")),
+            branch: Some(String::from("feature/test")),
+            pr: PullRequestSummary {
+                title: String::from("Refactor"),
+                ..PullRequestSummary::default()
+            },
+            files_changed: 1,
+            review_comments: 1,
+            threads: 1,
+            codeowners_found: false,
+            policy_found: false,
+            product_boundary: Default::default(),
+            changed_files: vec![String::from("src/api.rs")],
+            comments: vec![CommentRecord {
+                comment_id: String::from("1"),
+                thread_id: String::from("1"),
+                author: String::from("reviewer"),
+                body: String::from(body),
+                path: Some(String::from("src/api.rs")),
+                source: CommentSource::ReviewComment,
+                reply_to_comment_id: None,
+                created_at: None,
+                line: Some(1),
+                original_line: Some(1),
+            }],
+            issue_comments: Vec::new(),
+            review_threads: Vec::new(),
+            partial_sources: Vec::new(),
+            warnings: Vec::new(),
+        }
     }
 }
