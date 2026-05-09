@@ -59,6 +59,7 @@ fn parse_rule(line: &str) -> Option<CodeownerRule> {
         .take_while(|value| !value.starts_with('#'))
         .map(ToOwned::to_owned)
         .collect::<Vec<_>>();
+    // GitHub CODEOWNERS permits ownerless entries to override broader owners.
     if !owners.iter().all(|owner| is_valid_owner(owner)) {
         return None;
     }
