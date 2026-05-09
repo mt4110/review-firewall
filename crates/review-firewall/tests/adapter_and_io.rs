@@ -676,6 +676,28 @@ fn scan_review_replies_share_root_thread_id() {
 }
 
 #[test]
+fn scan_review_reply_uses_own_thread_id_when_parent_is_missing() {
+    let mut comments = vec![comment("13", Some("12"), CommentSource::ReviewComment)];
+
+    command::scan::normalize_review_comment_thread_ids_for_tests(&mut comments);
+
+    assert_eq!(comments[0].thread_id, "13");
+}
+
+#[test]
+fn scan_review_reply_uses_own_thread_id_when_parent_chain_is_partial() {
+    let mut comments = vec![
+        comment("13", Some("12"), CommentSource::ReviewComment),
+        comment("12", Some("11"), CommentSource::ReviewComment),
+    ];
+
+    command::scan::normalize_review_comment_thread_ids_for_tests(&mut comments);
+
+    assert_eq!(comments[0].thread_id, "13");
+    assert_eq!(comments[1].thread_id, "12");
+}
+
+#[test]
 fn scan_issue_comments_keep_independent_pseudo_thread_ids() {
     let mut comments = vec![
         comment("22", None, CommentSource::IssueComment),
