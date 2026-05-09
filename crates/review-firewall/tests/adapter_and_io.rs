@@ -480,6 +480,37 @@ fn scan_normalization_drops_empty_review_decisions() {
 }
 
 #[test]
+fn scan_normalization_captures_review_body_comments() {
+    let pr_value = serde_json::json!({
+        "reviews": [
+            {
+                "id": "PRR_1",
+                "state": "CHANGES_REQUESTED",
+                "body": "This breaks the response contract because partial status changes clients.",
+                "author": { "login": "reviewer-a" },
+                "submittedAt": "2026-03-28T00:00:00Z"
+            },
+            {
+                "id": "PRR_2",
+                "state": "COMMENTED",
+                "body": "",
+                "author": { "login": "reviewer-b" },
+                "submittedAt": "2026-03-28T00:00:01Z"
+            }
+        ]
+    });
+
+    let comments = command::scan::review_body_comment_records_for_tests(&pr_value);
+
+    assert_eq!(comments.len(), 1);
+    assert_eq!(comments[0].comment_id, "review:PRR_1");
+    assert_eq!(comments[0].thread_id, "review:PRR_1");
+    assert_eq!(comments[0].author, "reviewer-a");
+    assert_eq!(comments[0].path, None);
+    assert!(comments[0].body.contains("response contract"));
+}
+
+#[test]
 fn scan_changed_files_supplements_pr_file_list_with_api_files() {
     let merged = command::scan::merge_changed_files_for_tests(
         vec![String::from("src/a.rs"), String::from("src/b.rs")],

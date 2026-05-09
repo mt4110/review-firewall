@@ -65,6 +65,7 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
         Ok(pr_data) => {
             pr = build_pull_request_summary(&pr_data);
             changed_files = pr_changed_files(&pr_data);
+            comments = review_body_comment_records(&pr_data);
             let repository = repository_identity_from_pr_url(&pr_data)
                 .map(|identity| git::RepositoryProbe {
                     identity: Some(identity),
@@ -126,17 +127,13 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     pr_number,
                 ) {
                     Ok(probe) => {
-                        comments = probe
-                            .values
-                            .iter()
-                            .filter_map(review_comment_record)
-                            .map(|mut comment| {
+                        comments.extend(probe.values.iter().filter_map(review_comment_record).map(
+                            |mut comment| {
                                 comment.path =
                                     comment.path.take().map(|value| normalize_path(&value));
                                 comment
-                            })
-                            .collect();
-                        normalize_review_comment_thread_ids(&mut comments);
+                            },
+                        ));
                         if let Some(error) = probe.reason {
                             partial_sources.push(String::from("review_comments"));
                             merge_probe_reason(
@@ -159,6 +156,7 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                         );
                     }
                 }
+                normalize_review_comment_thread_ids(&mut comments);
 
                 match gh::issue_comments(
                     &repo_root.path,
@@ -469,6 +467,52 @@ pub fn api_changed_files_for_tests(values: &[Value]) -> Vec<String> {
     api_changed_files(values)
 }
 
+fn review_body_comment_records(value: &Value) -> Vec<CommentRecord> {
+    value
+        .get("reviews")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(review_body_comment_record)
+        .collect()
+}
+
+fn review_body_comment_record(value: &Value) -> Option<CommentRecord> {
+    let body = value.get("body")?.as_str()?.trim();
+    if body.is_empty() {
+        return None;
+    }
+    let id = json_id_string(value.get("id")?)?;
+    let comment_id = format!("review:{id}");
+    Some(CommentRecord {
+        comment_id: comment_id.clone(),
+        thread_id: comment_id,
+        author: value
+            .get("author")
+            .and_then(|author| author.get("login"))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned(),
+        body: body.to_owned(),
+        path: None,
+        source: CommentSource::ReviewComment,
+        reply_to_comment_id: None,
+        created_at: value
+            .get("submittedAt")
+            .or_else(|| value.get("submitted_at"))
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
+        line: None,
+        original_line: None,
+    })
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn review_body_comment_records_for_tests(value: &Value) -> Vec<CommentRecord> {
+    review_body_comment_records(value)
+}
+
 fn review_comment_record(value: &Value) -> Option<CommentRecord> {
     let id = value.get("id")?.as_u64()?.to_string();
     Some(CommentRecord {
@@ -507,6 +551,13 @@ fn review_comment_record(value: &Value) -> Option<CommentRecord> {
 #[allow(dead_code)]
 pub fn review_comment_record_for_tests(value: &Value) -> Option<CommentRecord> {
     review_comment_record(value)
+}
+
+fn json_id_string(value: &Value) -> Option<String> {
+    value
+        .as_str()
+        .map(ToOwned::to_owned)
+        .or_else(|| value.as_u64().map(|number| number.to_string()))
 }
 
 fn normalize_review_comment_thread_ids(comments: &mut [CommentRecord]) {

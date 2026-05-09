@@ -22,7 +22,7 @@ Allowed inputs for v0.1:
 - local git facts
 - changed files
 - PR metadata via `gh`
-- GitHub review comments
+- GitHub review comments, including review-level body comments
 - GitHub issue comments when available
 - CODEOWNERS files in `.github/`, repository root, or `docs/`
 - `review-firewall.toml`

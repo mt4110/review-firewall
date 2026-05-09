@@ -199,7 +199,7 @@ Collect and normalize:
 - CODEOWNERS presence from `.github/CODEOWNERS`, `CODEOWNERS`, or `docs/CODEOWNERS`
 - config presence
 - PR metadata via `gh`
-- review comments
+- review comments, including review-level body comments
 - issue comments when available
 
 When PR file data is available from GitHub, it is authoritative.
