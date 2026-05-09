@@ -29,6 +29,9 @@ pub fn build_report_markdown(
                 ));
             }
         }
+        _ if status != Status::Ok => {
+            lines.push(String::from("- unknown: blocker analysis did not complete"))
+        }
         _ => lines.push(String::from("- none")),
     }
 
@@ -47,14 +50,23 @@ pub fn build_report_markdown(
         let escalation_count = escalation_markdown
             .map(count_escalation_candidates)
             .unwrap_or(0);
-        lines.push(String::from(
-            "Impact: no current merge blocker was extracted",
-        ));
-        lines.push(if escalation_count > 0 {
-            String::from("Action: move the long-running design thread to ADR/RFC")
+        if status != Status::Ok {
+            lines.push(String::from(
+                "Impact: blocker analysis did not complete; no merge-safety claim is available",
+            ));
+            lines.push(String::from(
+                "Action: resolve missing analysis inputs before making a merge decision",
+            ));
         } else {
-            String::from("Action: continue normal PR follow-up")
-        });
+            lines.push(String::from(
+                "Impact: no current merge blocker was extracted",
+            ));
+            lines.push(if escalation_count > 0 {
+                String::from("Action: move the long-running design thread to ADR/RFC")
+            } else {
+                String::from("Action: continue normal PR follow-up")
+            });
+        }
     }
 
     lines.push(String::new());

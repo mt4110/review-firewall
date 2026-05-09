@@ -23,6 +23,13 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
         let policy = config::load(&repo_root.path);
         let codeowners_file = codeowners::load(&repo_root.path);
         let mut gate = gate_scan(&scan, &policy.gate_snapshot(), &codeowners_file.rules);
+        if let Some(codeowners_reason) = codeowners_file.reason {
+            gate.status = gate.status.merge(Status::Partial);
+            if gate.reason.is_none() {
+                gate.reason = Some(codeowners_reason.clone());
+            }
+            gate.warnings.push(codeowners_reason);
+        }
         if let Some(config_reason) = policy.reason {
             gate.status = gate.status.merge(policy.status);
             if gate.reason.is_none() {

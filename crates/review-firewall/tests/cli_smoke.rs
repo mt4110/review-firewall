@@ -409,6 +409,29 @@ fn report_preserves_error_status_when_upstream_artifact_is_missing() {
 }
 
 #[test]
+fn gate_marks_codeowners_load_failure_as_partial() {
+    let repo = temp_dir("gate-codeowners-partial");
+    init_repo(&repo);
+    let gh_stub = install_gh_success_stub(&repo);
+
+    let scan = run_with_path(&repo, &gh_stub, &["scan", "--pr", "42"]);
+    assert!(scan.status.success());
+    fs::remove_dir_all(repo.join(".github")).expect("remove github dir");
+    fs::create_dir(repo.join("CODEOWNERS")).expect("codeowners directory");
+
+    let gate = run_with_path(&repo, &gh_stub, &["gate"]);
+
+    assert!(gate.status.success());
+    let stdout = String::from_utf8_lossy(&gate.stdout);
+    assert!(stdout.contains("STATUS: PARTIAL"));
+    assert!(stdout.contains("REASON:"));
+    let run_dir = latest_run_dir(&repo);
+    let gate_json = fs::read_to_string(run_dir.join("gate.json")).expect("gate");
+    assert!(gate_json.contains(r#""status": "PARTIAL""#));
+    assert!(gate_json.contains(r#""warnings""#));
+}
+
+#[test]
 fn gate_writes_error_artifact_for_unreadable_scan_artifact() {
     let repo = temp_dir("gate-corrupt-scan");
     init_repo(&repo);

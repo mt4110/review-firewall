@@ -159,6 +159,25 @@ fn report_counts_non_adr_escalation_candidates() {
     assert!(report.contains("Move the long-running design thread into ADR/RFC"));
 }
 
+#[test]
+fn report_avoids_no_blocker_claim_when_analysis_is_partial() {
+    let gate = non_authoritative_gate(Status::Partial, "CODEOWNERS could not be read");
+
+    let report = build_report_markdown(
+        Status::Partial,
+        Some("CODEOWNERS could not be read"),
+        None,
+        Some(&gate),
+        None,
+        Some("# Escalation\n\nNo ADR/RFC candidates were found."),
+    );
+
+    assert!(report.contains("- unknown: blocker analysis did not complete"));
+    assert!(report.contains("no merge-safety claim is available"));
+    assert!(!report.contains("no current merge blocker was extracted"));
+    assert!(!report.contains("continue normal PR follow-up"));
+}
+
 fn non_authoritative_gate(status: Status, reason: &str) -> GateArtifact {
     GateArtifact {
         status,
