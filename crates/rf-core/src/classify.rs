@@ -526,6 +526,13 @@ fn has_runtime_risk_context(text: &str) -> bool {
             "broken",
             "fail",
             "leak",
+            "xss",
+            "csrf",
+            "ssrf",
+            "sql injection",
+            "path traversal",
+            "open redirect",
+            "vuln",
             "unsafe",
             "bypass",
             "stale",
@@ -807,8 +814,16 @@ fn contains_any(text: &str, needles: &[&str]) -> bool {
 fn count_matches(text: &str, needles: &[&str]) -> usize {
     needles
         .iter()
-        .filter(|needle| text.contains(**needle))
+        .filter(|needle| concern_keyword_matches(text, needle))
         .count()
+}
+
+fn concern_keyword_matches(text: &str, needle: &str) -> bool {
+    if needle.is_ascii() && needle.bytes().all(is_ascii_word_byte) {
+        contains_ascii_marker(text, needle)
+    } else {
+        text.contains(needle)
+    }
 }
 
 fn backtick_fragments(body: &str) -> Vec<String> {
@@ -844,10 +859,11 @@ fn dedupe_strings(values: Vec<String>) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use crate::domain::{
-        CommentRecord, CommentSource, GateConfigSnapshot, PullRequestSummary, ScanArtifact, Status,
+        BlockerConcern, CommentRecord, CommentSource, GateConfigSnapshot, PullRequestSummary,
+        ScanArtifact, Status,
     };
 
-    use super::gate_scan;
+    use super::{extract_concern, gate_scan};
 
     #[test]
     fn rejects_preference_only_comment() {
@@ -891,5 +907,59 @@ mod tests {
         let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
         assert_eq!(gate.counts.nits, 1);
         assert!(gate.residual_blockers.is_empty());
+    }
+
+    #[test]
+    fn runtime_security_terms_survive_metalinguistic_context() {
+        let scan = ScanArtifact {
+            status: Status::Ok,
+            reason: None,
+            scan_partial: false,
+            repo_root: Some(String::from("/tmp/review-firewall")),
+            branch: Some(String::from("feature/test")),
+            pr: PullRequestSummary {
+                title: String::from("Refactor"),
+                ..PullRequestSummary::default()
+            },
+            files_changed: 1,
+            review_comments: 1,
+            threads: 1,
+            codeowners_found: false,
+            policy_found: false,
+            product_boundary: Default::default(),
+            changed_files: vec![String::from("src/profile.rs")],
+            comments: vec![CommentRecord {
+                comment_id: String::from("1"),
+                thread_id: String::from("1"),
+                author: String::from("reviewer"),
+                body: String::from(
+                    "UI allows XSS in this PR when the profile name returns unescaped input and can leak an auth token.",
+                ),
+                path: Some(String::from("src/profile.rs")),
+                source: CommentSource::ReviewComment,
+                reply_to_comment_id: None,
+                created_at: None,
+                line: Some(1),
+                original_line: Some(1),
+            }],
+            issue_comments: Vec::new(),
+            review_threads: Vec::new(),
+            partial_sources: Vec::new(),
+            warnings: Vec::new(),
+        };
+
+        let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+        assert_eq!(gate.residual_blockers.len(), 1);
+        assert_eq!(gate.residual_blockers[0].concern, BlockerConcern::Security);
+    }
+
+    #[test]
+    fn concern_keywords_use_word_boundaries_for_short_ascii_tokens() {
+        assert_eq!(extract_concern("This capability label is confusing."), None);
+        assert_eq!(
+            extract_concern("The public API contract changes here."),
+            Some(BlockerConcern::Api)
+        );
     }
 }
