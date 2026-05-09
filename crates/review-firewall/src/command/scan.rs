@@ -108,20 +108,33 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                 }
 
                 if changed_files.is_empty() || changed_files_partial {
-                    let local_changed =
-                        git::changed_files(&repo_root.path, pr.base_branch.as_deref());
                     changed_files = if changed_files_partial {
-                        supplement_changed_files_from_local(changed_files, local_changed.paths)
+                        let base_changed = git::changed_files_against_base(
+                            &repo_root.path,
+                            pr.base_branch.as_deref(),
+                        );
+                        let base_reason = base_changed.reason.clone();
+                        let paths = base_changed.paths;
+                        merge_probe_reason(
+                            &mut status,
+                            &mut reason,
+                            &mut warnings,
+                            base_reason,
+                            Status::Partial,
+                        );
+                        supplement_changed_files_from_base_diff(changed_files, paths)
                     } else {
+                        let local_changed =
+                            git::changed_files(&repo_root.path, pr.base_branch.as_deref());
+                        merge_probe_reason(
+                            &mut status,
+                            &mut reason,
+                            &mut warnings,
+                            local_changed.reason.clone(),
+                            Status::Partial,
+                        );
                         fallback_changed_files_from_local(changed_files, local_changed.paths)
                     };
-                    merge_probe_reason(
-                        &mut status,
-                        &mut reason,
-                        &mut warnings,
-                        local_changed.reason,
-                        Status::Partial,
-                    );
                 }
 
                 match gh::review_comments(
@@ -450,8 +463,11 @@ fn fallback_changed_files_from_local(primary: Vec<String>, local: Vec<String>) -
     if primary.is_empty() { local } else { primary }
 }
 
-fn supplement_changed_files_from_local(primary: Vec<String>, local: Vec<String>) -> Vec<String> {
-    merge_changed_files(primary, &local)
+fn supplement_changed_files_from_base_diff(
+    primary: Vec<String>,
+    base_diff: Vec<String>,
+) -> Vec<String> {
+    merge_changed_files(primary, &base_diff)
 }
 
 #[cfg(test)]
@@ -471,11 +487,11 @@ pub fn fallback_changed_files_from_local_for_tests(
 
 #[cfg(test)]
 #[allow(dead_code)]
-pub fn supplement_changed_files_from_local_for_tests(
+pub fn supplement_changed_files_from_base_diff_for_tests(
     primary: Vec<String>,
-    local: Vec<String>,
+    base_diff: Vec<String>,
 ) -> Vec<String> {
-    supplement_changed_files_from_local(primary, local)
+    supplement_changed_files_from_base_diff(primary, base_diff)
 }
 
 #[cfg(test)]

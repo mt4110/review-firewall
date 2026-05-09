@@ -273,6 +273,27 @@ fn git_changed_files_merges_worktree_status_with_base_diff() {
 }
 
 #[test]
+fn git_changed_files_against_base_excludes_dirty_worktree_status() {
+    let repo = temp_dir("changed-files-base-only");
+    run_git(&repo, &["init", "--initial-branch=main"]);
+    run_git(&repo, &["config", "user.email", "review-bot@example.com"]);
+    run_git(&repo, &["config", "user.name", "Review Bot"]);
+    fs::write(repo.join("base.rs"), "base\n").expect("write base");
+    run_git(&repo, &["add", "base.rs"]);
+    run_git(&repo, &["commit", "-m", "base"]);
+    run_git(&repo, &["checkout", "-b", "feature"]);
+    fs::write(repo.join("pr.rs"), "pr\n").expect("write pr");
+    run_git(&repo, &["add", "pr.rs"]);
+    run_git(&repo, &["commit", "-m", "pr"]);
+    fs::write(repo.join("dirty.rs"), "dirty\n").expect("write dirty");
+
+    let changed = adapter::git::changed_files_against_base(&repo, Some("main"));
+
+    assert_eq!(changed.paths, vec![String::from("pr.rs")]);
+    assert!(changed.reason.is_none());
+}
+
+#[test]
 fn git_changed_files_prefers_origin_base_over_stale_local_base() {
     let repo = temp_dir("changed-files-origin-base");
     run_git(&repo, &["init", "--initial-branch=main"]);
@@ -392,6 +413,17 @@ fn git_remote_parser_prefers_origin_fetch_for_custom_enterprise_host() {
     .expect("parsed enterprise remote");
 
     assert_eq!(parsed.host, "git.company.internal");
+    assert_eq!(parsed.full_name, "example/review-firewall");
+}
+
+#[test]
+fn git_remote_parser_skips_known_non_github_origin_when_github_remote_exists() {
+    let parsed = adapter::git::parse_repository_identity_from_remotes_for_tests(
+        "origin\tgit@gitlab.com:example/not-this.git (fetch)\norigin\tgit@gitlab.com:example/not-this.git (push)\nupstream\tgit@github.com:example/review-firewall.git (fetch)\n",
+    )
+    .expect("parsed github remote");
+
+    assert_eq!(parsed.host, "github.com");
     assert_eq!(parsed.full_name, "example/review-firewall");
 }
 
@@ -544,7 +576,7 @@ fn scan_changed_files_use_local_diff_only_when_pr_files_are_unavailable() {
 
 #[test]
 fn scan_changed_files_supplements_pr_file_list_with_local_diff_after_api_failure() {
-    let recovered = command::scan::supplement_changed_files_from_local_for_tests(
+    let recovered = command::scan::supplement_changed_files_from_base_diff_for_tests(
         vec![String::from("src/pr.rs")],
         vec![String::from("src/local.rs"), String::from("src/pr.rs")],
     );

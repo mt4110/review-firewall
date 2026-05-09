@@ -112,7 +112,7 @@ crates/
 `latest.json` is used instead of a symlink so the run store stays Windows-compatible.
 
 When paged GitHub PR file data is fully available, that file list is authoritative.
-Local git changed files are used as a fallback for unavailable PR file data and as a supplement when changed-file metadata is explicitly partial.
+Local git changed files are used as a fallback for unavailable PR file data; a base-branch diff supplements the list only when changed-file metadata is explicitly partial.
 
 For v0.1, top-level PR issue comments are kept as independent pseudo-threads unless the input carries an explicit shared thread id.
 This avoids mixing unrelated PR-level conversations into one escalation signal while keeping hosted topic inference out of v0.1.

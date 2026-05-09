@@ -181,44 +181,61 @@ pub fn changed_files(repo_root: &Path, base_branch: Option<&str>) -> PathsProbe 
         )
     };
 
-    let mut base_diff_failed_reasons = Vec::new();
-    let mut base_diff_succeeded = false;
-    if let Some(base_branch) = base_branch.filter(|value| !value.trim().is_empty()) {
-        for reference in [format!("origin/{base_branch}"), base_branch.to_owned()] {
-            let attempt = vec![
-                String::from("diff"),
-                String::from("--name-only"),
-                format!("{reference}...HEAD"),
-            ];
-            let output = run_process(repo_root, "git", &attempt);
-            if output.success {
-                base_diff_succeeded = true;
-                merge_paths(&mut paths, parse_changed_paths(&output.stdout));
-                break;
-            } else {
-                base_diff_failed_reasons.push(
-                    output
-                        .reason
-                        .unwrap_or_else(|| fallback_reason(output.stderr, "git diff failed")),
-                );
-            }
-        }
-    }
-
-    let base_reason =
-        if base_branch.is_some() && !base_diff_succeeded && !base_diff_failed_reasons.is_empty() {
-            Some(format!(
-                "Could not diff against base branch '{}': {}",
-                base_branch.unwrap_or_default(),
-                summarize_reasons(&base_diff_failed_reasons)
-            ))
-        } else {
-            None
-        };
+    let base_reason = base_branch
+        .filter(|value| !value.trim().is_empty())
+        .and_then(|base_branch| {
+            let base_probe = changed_files_against_base(repo_root, Some(base_branch));
+            merge_paths(&mut paths, base_probe.paths);
+            base_probe.reason
+        });
 
     PathsProbe {
         paths,
         reason: combine_reasons(status_reason, base_reason),
+    }
+}
+
+pub fn changed_files_against_base(repo_root: &Path, base_branch: Option<&str>) -> PathsProbe {
+    let Some(base_branch) = base_branch.filter(|value| !value.trim().is_empty()) else {
+        return PathsProbe {
+            paths: Vec::new(),
+            reason: Some(String::from(
+                "Could not diff against base branch: base branch is unknown",
+            )),
+        };
+    };
+
+    let mut paths = Vec::new();
+    let mut failed_reasons = Vec::new();
+    for reference in [format!("origin/{base_branch}"), base_branch.to_owned()] {
+        let attempt = vec![
+            String::from("diff"),
+            String::from("--name-only"),
+            format!("{reference}...HEAD"),
+        ];
+        let output = run_process(repo_root, "git", &attempt);
+        if output.success {
+            merge_paths(&mut paths, parse_changed_paths(&output.stdout));
+            return PathsProbe {
+                paths,
+                reason: None,
+            };
+        } else {
+            failed_reasons.push(
+                output
+                    .reason
+                    .unwrap_or_else(|| fallback_reason(output.stderr, "git diff failed")),
+            );
+        }
+    }
+
+    PathsProbe {
+        paths,
+        reason: Some(format!(
+            "Could not diff against base branch '{}': {}",
+            base_branch,
+            summarize_reasons(&failed_reasons)
+        )),
     }
 }
 
@@ -257,6 +274,9 @@ fn combine_reasons(first: Option<String>, second: Option<String>) -> Option<Stri
 fn parse_github_remote(remote: &str) -> Option<RepositoryIdentity> {
     let remote = remote.trim();
     let (host, suffix) = parse_remote_host_and_path(remote)?;
+    if is_known_non_github_host(host) {
+        return None;
+    }
     let suffix = suffix.trim_start_matches([':', '/']);
     let suffix = suffix.trim_end_matches('/');
     let suffix = suffix.strip_suffix(".git").unwrap_or(suffix);
@@ -273,6 +293,13 @@ fn parse_github_remote(remote: &str) -> Option<RepositoryIdentity> {
         host: host.to_owned(),
         full_name: format!("{owner}/{name}"),
     })
+}
+
+fn is_known_non_github_host(host: &str) -> bool {
+    matches!(
+        host.to_ascii_lowercase().as_str(),
+        "gitlab.com" | "bitbucket.org" | "ssh.dev.azure.com" | "dev.azure.com"
+    )
 }
 
 fn parse_repository_identity_from_remotes(output: &str) -> Option<RepositoryIdentity> {
