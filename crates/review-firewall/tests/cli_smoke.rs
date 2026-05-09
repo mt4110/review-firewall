@@ -705,7 +705,7 @@ fn stopless_partial_path_still_writes_artifacts() {
     assert!(scan.contains(r#""status": "PARTIAL""#));
     assert!(scan.contains("gh stub failure"));
     assert!(scan.contains("src/local_only.rs"));
-    assert!(!scan.contains("src/scratch.rs"));
+    assert!(scan.contains("src/scratch.rs"));
     assert!(report.contains("STATUS: PARTIAL"));
 }
 

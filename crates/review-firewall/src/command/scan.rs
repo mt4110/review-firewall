@@ -243,7 +243,7 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
             );
             let fallback_base_branch = git::fallback_base_branch(&repo_root.path);
             let base_branch = non_empty_base_branch(&fallback_base_branch.value);
-            let local_changed = git::changed_files_against_base(&repo_root.path, base_branch);
+            let local_changed = git::changed_files(&repo_root.path, base_branch);
             changed_files = local_changed.paths;
             merge_probe_reason(
                 &mut status,
