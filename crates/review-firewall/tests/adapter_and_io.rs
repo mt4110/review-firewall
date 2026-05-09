@@ -186,6 +186,16 @@ fn git_remote_parser_normalizes_github_origin() {
 }
 
 #[test]
+fn git_remote_parser_supports_scp_remote_without_user() {
+    let parsed =
+        adapter::git::parse_github_remote_for_tests("github.com:example/review-firewall.git")
+            .expect("parsed remote");
+
+    assert_eq!(parsed.host, "github.com");
+    assert_eq!(parsed.full_name, "example/review-firewall");
+}
+
+#[test]
 fn git_remote_parser_normalizes_trailing_slash_after_git_suffix() {
     let parsed = adapter::git::parse_github_remote_for_tests(
         "https://github.com/example/review-firewall.git/",

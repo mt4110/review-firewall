@@ -367,8 +367,10 @@ fn parse_remote_host_and_path(remote: &str) -> Option<(&str, &str)> {
     }
 
     if let Some((authority, path)) = remote.split_once(':')
-        && authority.contains('@')
+        && !authority.is_empty()
         && !path.is_empty()
+        && path.contains('/')
+        && !authority.contains(['/', '\\'])
     {
         return Some((parse_remote_host(authority), path));
     }
