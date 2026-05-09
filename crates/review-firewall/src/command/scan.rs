@@ -69,6 +69,8 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
             pr = build_pull_request_summary(&pr_data);
             changed_files = pr_changed_files(&pr_data);
             comments = review_body_comment_records(&pr_data);
+            issue_comments = pr_view_issue_comment_records(&pr_data);
+            normalize_issue_comment_thread_ids(&mut issue_comments);
             let repository = repository_identity_from_pr_url(&pr_data)
                 .map(|identity| git::RepositoryProbe {
                     identity: Some(identity),
@@ -205,16 +207,18 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     Some(pr.author.as_str()),
                 );
             } else if pr.number.is_some() && repository.identity.is_none() {
-                let base_paths = verified_base_changed_files(
-                    &repo_root.path,
-                    pr.base_branch.as_deref(),
-                    pr.head_oid.as_deref(),
-                    &mut status,
-                    &mut reason,
-                    &mut warnings,
-                    &mut partial_sources,
-                );
-                changed_files = merge_changed_files(changed_files, &base_paths);
+                if changed_files.is_empty() {
+                    let base_paths = verified_base_changed_files(
+                        &repo_root.path,
+                        pr.base_branch.as_deref(),
+                        pr.head_oid.as_deref(),
+                        &mut status,
+                        &mut reason,
+                        &mut warnings,
+                        &mut partial_sources,
+                    );
+                    changed_files = merge_changed_files(changed_files, &base_paths);
+                }
                 partial_sources.push(String::from("repository_identity"));
                 merge_probe_reason(
                     &mut status,
@@ -570,6 +574,22 @@ fn review_body_comment_records(value: &Value) -> Vec<CommentRecord> {
         .collect()
 }
 
+fn pr_view_issue_comment_records(value: &Value) -> Vec<CommentRecord> {
+    value
+        .get("comments")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(issue_comment_record)
+        .collect()
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn pr_view_issue_comment_records_for_tests(value: &Value) -> Vec<CommentRecord> {
+    pr_view_issue_comment_records(value)
+}
+
 fn review_body_comment_record(value: &Value) -> Option<CommentRecord> {
     let body = value.get("body")?.as_str()?.trim();
     if body.is_empty() {
@@ -714,12 +734,13 @@ pub fn normalize_issue_comment_thread_ids_for_tests(comments: &mut [CommentRecor
 }
 
 fn issue_comment_record(value: &Value) -> Option<CommentRecord> {
-    let id = value.get("id")?.as_u64()?.to_string();
+    let id = json_id_string(value.get("id")?)?;
     Some(CommentRecord {
         comment_id: id.clone(),
         thread_id: format!("issue:{id}"),
         author: value
             .get("user")
+            .or_else(|| value.get("author"))
             .and_then(|user| user.get("login"))
             .and_then(Value::as_str)
             .unwrap_or_default()
@@ -734,6 +755,7 @@ fn issue_comment_record(value: &Value) -> Option<CommentRecord> {
         reply_to_comment_id: None,
         created_at: value
             .get("created_at")
+            .or_else(|| value.get("createdAt"))
             .and_then(Value::as_str)
             .map(ToOwned::to_owned),
         line: None,

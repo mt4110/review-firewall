@@ -622,6 +622,31 @@ fn scan_normalization_captures_review_body_comments() {
 }
 
 #[test]
+fn scan_normalization_captures_pr_view_issue_comments() {
+    let pr_value = serde_json::json!({
+        "comments": [
+            {
+                "id": "IC_1",
+                "body": "This conversation-tab blocker should stay visible.",
+                "author": { "login": "reviewer-a" },
+                "createdAt": "2026-03-28T00:00:01Z"
+            }
+        ]
+    });
+
+    let comments = command::scan::pr_view_issue_comment_records_for_tests(&pr_value);
+
+    assert_eq!(comments.len(), 1);
+    assert_eq!(comments[0].comment_id, "IC_1");
+    assert_eq!(comments[0].thread_id, "issue:IC_1");
+    assert_eq!(comments[0].author, "reviewer-a");
+    assert_eq!(
+        comments[0].created_at.as_deref(),
+        Some("2026-03-28T00:00:01Z")
+    );
+}
+
+#[test]
 fn scan_changed_files_supplements_pr_file_list_with_api_files() {
     let merged = command::scan::merge_changed_files_for_tests(
         vec![String::from("src/a.rs"), String::from("src/b.rs")],

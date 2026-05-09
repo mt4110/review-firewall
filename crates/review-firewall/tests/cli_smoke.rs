@@ -205,7 +205,7 @@ set -eu
 if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
 head_oid=$(git rev-parse HEAD)
 cat <<JSON
-{"number":42,"title":"Body-only review","body":"Body","author":{"login":"author"},"baseRefName":"main","headRefName":"feature/test","headRefOid":"$head_oid","labels":[],"reviewDecision":"CHANGES_REQUESTED","files":[{"path":"src/api.rs"}],"reviews":[{"id":"PRR_1","state":"CHANGES_REQUESTED","body":"This breaks the response contract because partial status changes clients.","author":{"login":"reviewer-a"},"submittedAt":"2026-03-28T00:00:00Z"}],"url":"not-a-pr-url"}
+{"number":42,"title":"Body-only review","body":"Body","author":{"login":"author"},"baseRefName":"main","headRefName":"feature/test","headRefOid":"$head_oid","labels":[],"reviewDecision":"CHANGES_REQUESTED","comments":[{"id":"IC_1","body":"Conversation tab blocker is still available from pr view.","author":{"login":"reviewer-a"},"createdAt":"2026-03-28T00:00:01Z"}],"files":[{"path":"src/api.rs"}],"reviews":[{"id":"PRR_1","state":"CHANGES_REQUESTED","body":"This breaks the response contract because partial status changes clients.","author":{"login":"reviewer-a"},"submittedAt":"2026-03-28T00:00:00Z"}],"url":"not-a-pr-url"}
 JSON
 exit 0
 fi
@@ -225,7 +225,7 @@ fn gh_identity_missing_stub_contents() -> &'static str {
 setlocal
 if "%1"=="pr" if "%2"=="view" (
   for /f %%i in ('git rev-parse HEAD') do set HEAD_OID=%%i
-  echo {"number":42,"title":"Body-only review","body":"Body","author":{"login":"author"},"baseRefName":"main","headRefName":"feature/test","headRefOid":"%HEAD_OID%","labels":[],"reviewDecision":"CHANGES_REQUESTED","files":[{"path":"src/api.rs"}],"reviews":[{"id":"PRR_1","state":"CHANGES_REQUESTED","body":"This breaks the response contract because partial status changes clients.","author":{"login":"reviewer-a"},"submittedAt":"2026-03-28T00:00:00Z"}],"url":"not-a-pr-url"}
+  echo {"number":42,"title":"Body-only review","body":"Body","author":{"login":"author"},"baseRefName":"main","headRefName":"feature/test","headRefOid":"%HEAD_OID%","labels":[],"reviewDecision":"CHANGES_REQUESTED","comments":[{"id":"IC_1","body":"Conversation tab blocker is still available from pr view.","author":{"login":"reviewer-a"},"createdAt":"2026-03-28T00:00:01Z"}],"files":[{"path":"src/api.rs"}],"reviews":[{"id":"PRR_1","state":"CHANGES_REQUESTED","body":"This breaks the response contract because partial status changes clients.","author":{"login":"reviewer-a"},"submittedAt":"2026-03-28T00:00:00Z"}],"url":"not-a-pr-url"}
   exit /b 0
 )
 >&2 echo unexpected gh invocation
@@ -352,14 +352,16 @@ fn scan_preserves_review_body_threads_without_repository_identity() {
     assert!(scan.status.success());
     let stdout = String::from_utf8_lossy(&scan.stdout);
     assert!(stdout.contains("STATUS: PARTIAL"));
-    assert!(stdout.contains("Threads: 1"));
+    assert!(stdout.contains("Threads: 2"));
     let run_dir = latest_run_dir(&repo);
     let scan_json = fs::read_to_string(run_dir.join("scan.json")).expect("scan");
-    assert!(scan_json.contains(r#""files_changed": 2"#));
-    assert!(scan_json.contains(r#""src/local.rs""#));
+    assert!(scan_json.contains(r#""files_changed": 1"#));
+    assert!(!scan_json.contains(r#""src/local.rs""#));
     assert!(scan_json.contains(r#""review_comments": 1"#));
-    assert!(scan_json.contains(r#""threads": 1"#));
+    assert!(scan_json.contains(r#""threads": 2"#));
     assert!(scan_json.contains(r#""thread_id": "review:PRR_1""#));
+    assert!(scan_json.contains(r#""thread_id": "issue:IC_1""#));
+    assert!(scan_json.contains("Conversation tab blocker"));
     assert!(scan_json.contains("repository_identity"));
 }
 
