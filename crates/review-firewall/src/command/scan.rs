@@ -724,7 +724,10 @@ fn root_comment_id(comment_id: &str, by_id: &HashMap<String, Option<String>>) ->
     let mut current = comment_id;
     let mut visited = Vec::<String>::new();
     while let Some(Some(parent_id)) = by_id.get(current) {
-        if !by_id.contains_key(parent_id) || visited.iter().any(|seen| seen == parent_id) {
+        if !by_id.contains_key(parent_id) {
+            return parent_id.to_owned();
+        }
+        if visited.iter().any(|seen| seen == parent_id) {
             return comment_id.to_owned();
         }
         visited.push(parent_id.clone());
