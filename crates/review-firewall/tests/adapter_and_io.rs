@@ -538,7 +538,7 @@ fn scan_review_replies_share_root_thread_id() {
 }
 
 #[test]
-fn scan_issue_comments_keep_independent_pseudo_thread_ids() {
+fn scan_issue_comments_share_pr_conversation_thread_id() {
     let mut comments = vec![
         comment("22", None, CommentSource::IssueComment),
         comment("21", None, CommentSource::IssueComment),
@@ -548,8 +548,8 @@ fn scan_issue_comments_keep_independent_pseudo_thread_ids() {
 
     command::scan::normalize_issue_comment_thread_ids_for_tests(&mut comments);
 
-    assert_eq!(comments[0].thread_id, "issue:22");
-    assert_eq!(comments[1].thread_id, "issue:21");
+    assert_eq!(comments[0].thread_id, "issue:conversation");
+    assert_eq!(comments[1].thread_id, "issue:conversation");
 }
 
 #[test]

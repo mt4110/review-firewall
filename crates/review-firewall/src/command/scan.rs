@@ -11,6 +11,8 @@ use crate::adapter::{gh, git};
 use crate::command::CommandOutcome;
 use crate::io::{artifacts, codeowners, config, run_store};
 
+const ISSUE_CONVERSATION_THREAD_ID: &str = "issue:conversation";
+
 pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, String> {
     let repo_root = git::repo_root(cwd);
     let run = run_store::create_new(&repo_root.path).map_err(io_error)?;
@@ -508,8 +510,12 @@ fn root_comment_id(comment_id: &str, by_id: &HashMap<String, Option<String>>) ->
 fn normalize_issue_comment_thread_ids(comments: &mut [CommentRecord]) {
     for comment in comments {
         let thread_id = comment.thread_id.trim();
-        if thread_id.is_empty() {
-            comment.thread_id = format!("issue:{}", comment.comment_id);
+        let per_comment_thread_id = format!("issue:{}", comment.comment_id);
+        if thread_id.is_empty()
+            || thread_id == comment.comment_id
+            || thread_id == per_comment_thread_id
+        {
+            comment.thread_id = ISSUE_CONVERSATION_THREAD_ID.to_owned();
         } else if !thread_id.starts_with("issue:") {
             comment.thread_id = format!("issue:{thread_id}");
         } else {
@@ -534,7 +540,7 @@ fn issue_comment_record(value: &Value) -> Option<CommentRecord> {
     let id = value.get("id")?.as_u64()?.to_string();
     Some(CommentRecord {
         comment_id: id.clone(),
-        thread_id: format!("issue:{id}"),
+        thread_id: ISSUE_CONVERSATION_THREAD_ID.to_owned(),
         author: value
             .get("user")
             .and_then(|user| user.get("login"))

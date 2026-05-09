@@ -111,7 +111,7 @@ crates/
 
 `latest.json` is used instead of a symlink so the run store stays Windows-compatible.
 
-For v0.1, top-level PR issue comments remain independent pseudo-threads unless the input carries an explicit shared thread id.
+For v0.1, top-level PR issue comments are preserved as one chronological PR-conversation thread unless the input carries an explicit shared thread id.
 This keeps unrelated PR-level conversations from inflating escalation signals.
 
 ## Development

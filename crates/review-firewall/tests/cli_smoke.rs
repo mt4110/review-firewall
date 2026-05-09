@@ -280,7 +280,7 @@ fn smoke_flow_creates_all_artifacts() {
     let escalation = fs::read_to_string(run_dir.join("escalation.md")).expect("escalation");
     assert!(gate.contains(r#""status": "OK""#));
     assert!(gate.contains(r#""residual_blockers""#));
-    assert!(escalation.contains("No ADR/RFC candidates were found."));
+    assert!(escalation.contains("# RFC Candidate"));
 }
 
 #[test]

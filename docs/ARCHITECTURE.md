@@ -202,8 +202,8 @@ Collect and normalize:
 - review comments
 - issue comments when available
 
-For v0.1, general PR issue comments are kept as independent pseudo-threads unless the input already carries an explicit shared thread id.
-This avoids inferring one long debate from unrelated top-level comments without adding hosted topic inference.
+For v0.1, general PR issue comments are kept as one chronological PR-conversation thread unless the input already carries an explicit shared thread id.
+This preserves author/reviewer roundtrips from the PR conversation tab without adding hosted topic inference.
 
 Output:
 
