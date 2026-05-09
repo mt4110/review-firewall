@@ -206,11 +206,11 @@ fn config_rejects_generic_fix_word_when_alternative_is_required() {
 }
 
 #[test]
-fn author_replies_are_not_residual_blockers() {
+fn author_replies_are_matched_case_insensitively() {
     let mut scan = base_scan(
         "Fixed in this PR. Added a regression test for the merge behavior and should be safe now.",
     );
-    scan.pr.author = String::from("author");
+    scan.pr.author = String::from("Author");
     scan.comments[0].author = String::from("author");
     let config = GateConfigSnapshot {
         require_evidence: false,

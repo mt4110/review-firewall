@@ -85,7 +85,8 @@ pub fn gate_scan(
 }
 
 fn is_pr_author_comment(comment: &CommentRecord, scan: &ScanArtifact) -> bool {
-    !scan.pr.author.is_empty() && comment.author == scan.pr.author
+    let pr_author = scan.pr.author.trim();
+    !pr_author.is_empty() && comment.author.trim().eq_ignore_ascii_case(pr_author)
 }
 
 fn classify_comment(
