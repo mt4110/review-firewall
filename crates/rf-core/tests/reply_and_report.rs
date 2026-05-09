@@ -42,20 +42,7 @@ fn draft_reply_respects_max_lines() {
 
 #[test]
 fn draft_reply_avoids_merge_judgment_when_gate_is_error() {
-    let gate = GateArtifact {
-        status: Status::Error,
-        reason: Some(String::from("scan.json could not be read")),
-        comments_analyzed: 0,
-        residual_blockers: Vec::new(),
-        counts: GateCounts::default(),
-        candidate_blockers: Vec::new(),
-        downgraded_comments: Vec::new(),
-        duplicates_collapsed: Vec::new(),
-        warnings: Vec::new(),
-        config_snapshot: GateConfigSnapshot::default(),
-        classified_comments: Vec::new(),
-        escalation_candidates: Vec::new(),
-    };
+    let gate = non_authoritative_gate(Status::Error, "scan.json could not be read");
 
     let draft = build_draft_reply(&gate, 3);
 
@@ -64,6 +51,27 @@ fn draft_reply_avoids_merge_judgment_when_gate_is_error() {
     assert!(draft.target_comment_id.is_none());
     assert!(draft.body.contains("could not complete blocker analysis"));
     assert!(draft.body.contains("scan.json could not be read"));
+    assert!(!draft.body.contains("does not think this blocks merge"));
+}
+
+#[test]
+fn draft_reply_avoids_merge_judgment_when_gate_is_partial() {
+    let gate = non_authoritative_gate(
+        Status::Partial,
+        "review comments were partially unavailable",
+    );
+
+    let draft = build_draft_reply(&gate, 3);
+
+    assert_eq!(draft.status, Status::Partial);
+    assert_eq!(draft.reply_type, ReplyType::Decline);
+    assert!(draft.target_comment_id.is_none());
+    assert!(draft.body.contains("could not complete blocker analysis"));
+    assert!(
+        draft
+            .body
+            .contains("review comments were partially unavailable")
+    );
     assert!(!draft.body.contains("does not think this blocks merge"));
 }
 
@@ -149,4 +157,21 @@ fn report_counts_non_adr_escalation_candidates() {
 
     assert!(report.contains("Action: move the long-running design thread to ADR/RFC"));
     assert!(report.contains("Move the long-running design thread into ADR/RFC"));
+}
+
+fn non_authoritative_gate(status: Status, reason: &str) -> GateArtifact {
+    GateArtifact {
+        status,
+        reason: Some(String::from(reason)),
+        comments_analyzed: 0,
+        residual_blockers: Vec::new(),
+        counts: GateCounts::default(),
+        candidate_blockers: Vec::new(),
+        downgraded_comments: Vec::new(),
+        duplicates_collapsed: Vec::new(),
+        warnings: Vec::new(),
+        config_snapshot: GateConfigSnapshot::default(),
+        classified_comments: Vec::new(),
+        escalation_candidates: Vec::new(),
+    }
 }

@@ -3,7 +3,7 @@ use crate::domain::{DraftReplyArtifact, GateArtifact, ReplyType, Status};
 pub fn build_draft_reply(gate: &GateArtifact, max_lines: usize) -> DraftReplyArtifact {
     let max_lines = max_lines.max(1);
 
-    if gate.status == Status::Error {
+    if gate.status != Status::Ok {
         return DraftReplyArtifact {
             status: gate.status,
             reason: gate.reason.clone(),

@@ -377,6 +377,43 @@ fn draft_reply_avoids_merge_judgment_for_error_gate_artifact() {
 }
 
 #[test]
+fn draft_reply_avoids_merge_judgment_for_partial_gate_artifact() {
+    let repo = temp_dir("draft-partial-gate");
+    init_repo(&repo);
+    let gh_stub = install_gh_success_stub(&repo);
+
+    for args in [vec!["scan", "--pr", "42"], vec!["gate"]] {
+        let output = run_with_path(&repo, &gh_stub, &args);
+        assert!(output.status.success(), "command failed: {:?}", args);
+    }
+    let run_dir = latest_run_dir(&repo);
+    let gate_path = run_dir.join("gate.json");
+    let mut gate: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&gate_path).expect("gate")).expect("gate json");
+    gate["status"] = serde_json::Value::String(String::from("PARTIAL"));
+    gate["reason"] =
+        serde_json::Value::String(String::from("review comments partially unavailable"));
+    fs::write(
+        &gate_path,
+        format!(
+            "{}\n",
+            serde_json::to_string_pretty(&gate).expect("render gate")
+        ),
+    )
+    .expect("write gate");
+
+    let draft = run_with_path(&repo, &gh_stub, &["draft-reply"]);
+
+    assert!(draft.status.success());
+    let stdout = String::from_utf8_lossy(&draft.stdout);
+    assert!(stdout.contains("STATUS: PARTIAL"));
+    let draft_md = fs::read_to_string(run_dir.join("draft_reply.md")).expect("draft md");
+    assert!(draft_md.contains("could not complete blocker analysis"));
+    assert!(draft_md.contains("review comments partially unavailable"));
+    assert!(!draft_md.contains("does not think this blocks merge"));
+}
+
+#[test]
 fn draft_reply_writes_error_artifacts_for_unreadable_gate_artifact() {
     let repo = temp_dir("draft-corrupt-gate");
     init_repo(&repo);
