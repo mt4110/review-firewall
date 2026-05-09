@@ -74,6 +74,15 @@ fn install_gh_error_stub(root: &Path) -> PathBuf {
     stub_dir
 }
 
+fn install_gh_identity_missing_stub(root: &Path) -> PathBuf {
+    let stub_dir = root.join("bin-identity-missing");
+    fs::create_dir_all(&stub_dir).expect("stub identity missing dir");
+    let gh_path = gh_stub_path(&stub_dir);
+    fs::write(&gh_path, gh_identity_missing_stub_contents()).expect("write gh stub");
+    make_executable(&gh_path);
+    stub_dir
+}
+
 #[cfg(unix)]
 fn gh_stub_path(stub_dir: &Path) -> PathBuf {
     stub_dir.join("gh")
@@ -189,9 +198,37 @@ fn gh_error_stub_contents() -> &'static str {
     "#!/bin/sh\necho 'gh stub failure' >&2\nexit 1\n"
 }
 
+#[cfg(unix)]
+fn gh_identity_missing_stub_contents() -> &'static str {
+    r#"#!/bin/sh
+set -eu
+if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
+cat <<'JSON'
+{"number":42,"title":"Body-only review","body":"Body","author":{"login":"author"},"baseRefName":"main","headRefName":"feature/test","headRefOid":"0123456789abcdef0123456789abcdef01234567","labels":[],"reviewDecision":"CHANGES_REQUESTED","files":[{"path":"src/api.rs"}],"reviews":[{"id":"PRR_1","state":"CHANGES_REQUESTED","body":"This breaks the response contract because partial status changes clients.","author":{"login":"reviewer-a"},"submittedAt":"2026-03-28T00:00:00Z"}],"url":"not-a-pr-url"}
+JSON
+exit 0
+fi
+echo "unexpected gh invocation" >&2
+exit 1
+"#
+}
+
 #[cfg(windows)]
 fn gh_error_stub_contents() -> &'static str {
     "@echo off\r\n>&2 echo gh stub failure\r\nexit /b 1\r\n"
+}
+
+#[cfg(windows)]
+fn gh_identity_missing_stub_contents() -> &'static str {
+    r#"@echo off
+setlocal
+if "%1"=="pr" if "%2"=="view" (
+  echo {"number":42,"title":"Body-only review","body":"Body","author":{"login":"author"},"baseRefName":"main","headRefName":"feature/test","headRefOid":"0123456789abcdef0123456789abcdef01234567","labels":[],"reviewDecision":"CHANGES_REQUESTED","files":[{"path":"src/api.rs"}],"reviews":[{"id":"PRR_1","state":"CHANGES_REQUESTED","body":"This breaks the response contract because partial status changes clients.","author":{"login":"reviewer-a"},"submittedAt":"2026-03-28T00:00:00Z"}],"url":"not-a-pr-url"}
+  exit /b 0
+)
+>&2 echo unexpected gh invocation
+exit /b 1
+"#
 }
 
 fn binary_path() -> PathBuf {
@@ -285,6 +322,29 @@ fn smoke_flow_creates_all_artifacts() {
     assert!(gate.contains(r#""status": "OK""#));
     assert!(gate.contains(r#""residual_blockers""#));
     assert!(escalation.contains("No ADR/RFC candidates were found."));
+}
+
+#[test]
+fn scan_preserves_review_body_threads_without_repository_identity() {
+    let repo = temp_dir("scan-body-thread-no-identity");
+    init_repo(&repo);
+    run(Command::new("git")
+        .args(["remote", "remove", "origin"])
+        .current_dir(&repo));
+    let gh_stub = install_gh_identity_missing_stub(&repo);
+
+    let scan = run_with_path(&repo, &gh_stub, &["scan", "--pr", "42"]);
+
+    assert!(scan.status.success());
+    let stdout = String::from_utf8_lossy(&scan.stdout);
+    assert!(stdout.contains("STATUS: PARTIAL"));
+    assert!(stdout.contains("Threads: 1"));
+    let run_dir = latest_run_dir(&repo);
+    let scan_json = fs::read_to_string(run_dir.join("scan.json")).expect("scan");
+    assert!(scan_json.contains(r#""review_comments": 1"#));
+    assert!(scan_json.contains(r#""threads": 1"#));
+    assert!(scan_json.contains(r#""thread_id": "review:PRR_1""#));
+    assert!(scan_json.contains("repository_identity"));
 }
 
 #[test]

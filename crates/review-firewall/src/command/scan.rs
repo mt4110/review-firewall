@@ -296,6 +296,14 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
         }
     }
 
+    if review_threads.is_empty() && (!comments.is_empty() || !issue_comments.is_empty()) {
+        review_threads = build_conversation_threads_for_author(
+            &comments,
+            &issue_comments,
+            Some(pr.author.as_str()),
+        );
+    }
+
     changed_files = changed_files
         .into_iter()
         .map(|path| normalize_path(&path))
