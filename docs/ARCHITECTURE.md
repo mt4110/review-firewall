@@ -202,8 +202,8 @@ Collect and normalize:
 - review comments, including review-level body comments
 - issue comments when available
 
-When PR file data is available from GitHub, it is authoritative.
-Local git changed files are a fallback for local-only or partial GitHub metadata, not a supplement to an already populated PR file list.
+When paged PR file data is fully available from GitHub, it is authoritative.
+Local git changed files are a fallback for local-only metadata and a supplement only when changed-file metadata is explicitly partial or unavailable.
 
 For v0.1, top-level PR issue comments are kept as independent pseudo-threads unless the input already carries an explicit shared thread id.
 This avoids mixing unrelated PR-level conversations into one escalation signal without adding hosted topic inference.

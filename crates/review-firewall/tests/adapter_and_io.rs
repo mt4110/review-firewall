@@ -543,6 +543,19 @@ fn scan_changed_files_use_local_diff_only_when_pr_files_are_unavailable() {
 }
 
 #[test]
+fn scan_changed_files_supplements_pr_file_list_with_local_diff_after_api_failure() {
+    let recovered = command::scan::supplement_changed_files_from_local_for_tests(
+        vec![String::from("src/pr.rs")],
+        vec![String::from("src/local.rs"), String::from("src/pr.rs")],
+    );
+
+    assert_eq!(
+        recovered,
+        vec![String::from("src/pr.rs"), String::from("src/local.rs")]
+    );
+}
+
+#[test]
 fn scan_changed_files_reads_paged_api_filenames() {
     let values = vec![
         serde_json::json!({ "filename": "src\\api.rs" }),

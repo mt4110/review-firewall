@@ -72,6 +72,7 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                 .unwrap_or_else(|| git::repository_identity(&repo_root.path));
 
             if let (Some(pr_number), Some(repository)) = (pr.number, repository.identity.clone()) {
+                let mut changed_files_partial = false;
                 match gh::changed_files(
                     &repo_root.path,
                     &repository.full_name,
@@ -82,6 +83,7 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                         changed_files =
                             merge_changed_files(changed_files, &api_changed_files(&probe.values));
                         if let Some(error) = probe.reason {
+                            changed_files_partial = true;
                             partial_sources.push(String::from("changed_files"));
                             merge_probe_reason(
                                 &mut status,
@@ -93,6 +95,7 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                         }
                     }
                     Err(error) => {
+                        changed_files_partial = true;
                         partial_sources.push(String::from("changed_files"));
                         merge_probe_reason(
                             &mut status,
@@ -104,11 +107,14 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     }
                 }
 
-                if changed_files.is_empty() {
+                if changed_files.is_empty() || changed_files_partial {
                     let local_changed =
                         git::changed_files(&repo_root.path, pr.base_branch.as_deref());
-                    changed_files =
-                        fallback_changed_files_from_local(changed_files, local_changed.paths);
+                    changed_files = if changed_files_partial {
+                        supplement_changed_files_from_local(changed_files, local_changed.paths)
+                    } else {
+                        fallback_changed_files_from_local(changed_files, local_changed.paths)
+                    };
                     merge_probe_reason(
                         &mut status,
                         &mut reason,
@@ -444,6 +450,10 @@ fn fallback_changed_files_from_local(primary: Vec<String>, local: Vec<String>) -
     if primary.is_empty() { local } else { primary }
 }
 
+fn supplement_changed_files_from_local(primary: Vec<String>, local: Vec<String>) -> Vec<String> {
+    merge_changed_files(primary, &local)
+}
+
 #[cfg(test)]
 #[allow(dead_code)]
 pub fn merge_changed_files_for_tests(primary: Vec<String>, supplemental: &[String]) -> Vec<String> {
@@ -457,6 +467,15 @@ pub fn fallback_changed_files_from_local_for_tests(
     local: Vec<String>,
 ) -> Vec<String> {
     fallback_changed_files_from_local(primary, local)
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn supplement_changed_files_from_local_for_tests(
+    primary: Vec<String>,
+    local: Vec<String>,
+) -> Vec<String> {
+    supplement_changed_files_from_local(primary, local)
 }
 
 #[cfg(test)]
