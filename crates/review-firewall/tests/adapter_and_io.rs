@@ -435,6 +435,60 @@ fn git_fallback_base_branch_uses_local_main() {
 }
 
 #[test]
+fn git_fallback_base_branch_uses_remote_develop_without_origin_head() {
+    let repo = temp_dir("fallback-base-develop");
+    run_git(&repo, &["init", "--initial-branch=develop"]);
+    run_git(&repo, &["config", "user.email", "review-bot@example.com"]);
+    run_git(&repo, &["config", "user.name", "Review Bot"]);
+    fs::write(repo.join("base.rs"), "base\n").expect("write base");
+    run_git(&repo, &["add", "base.rs"]);
+    run_git(&repo, &["commit", "-m", "base"]);
+    run_git(
+        &repo,
+        &["update-ref", "refs/remotes/origin/develop", "HEAD"],
+    );
+    run_git(&repo, &["checkout", "-b", "feature", "origin/develop"]);
+    fs::write(repo.join("pr.rs"), "pr\n").expect("write pr");
+    run_git(&repo, &["add", "pr.rs"]);
+    run_git(&repo, &["commit", "-m", "pr"]);
+
+    let base = adapter::git::fallback_base_branch(&repo);
+    let changed = adapter::git::changed_files(&repo, Some(&base.value));
+
+    assert_eq!(base.value, "develop");
+    assert!(base.reason.is_none());
+    assert_eq!(changed.paths, vec![String::from("pr.rs")]);
+    assert!(changed.reason.is_none());
+}
+
+#[test]
+fn git_fallback_base_branch_infers_single_remote_branch() {
+    let repo = temp_dir("fallback-base-unique-remote");
+    run_git(&repo, &["init", "--initial-branch=release/next"]);
+    run_git(&repo, &["config", "user.email", "review-bot@example.com"]);
+    run_git(&repo, &["config", "user.name", "Review Bot"]);
+    fs::write(repo.join("base.rs"), "base\n").expect("write base");
+    run_git(&repo, &["add", "base.rs"]);
+    run_git(&repo, &["commit", "-m", "base"]);
+    run_git(
+        &repo,
+        &["update-ref", "refs/remotes/origin/release/next", "HEAD"],
+    );
+    run_git(&repo, &["checkout", "-b", "feature", "origin/release/next"]);
+    fs::write(repo.join("pr.rs"), "pr\n").expect("write pr");
+    run_git(&repo, &["add", "pr.rs"]);
+    run_git(&repo, &["commit", "-m", "pr"]);
+
+    let base = adapter::git::fallback_base_branch(&repo);
+    let changed = adapter::git::changed_files(&repo, Some(&base.value));
+
+    assert_eq!(base.value, "release/next");
+    assert!(base.reason.is_none());
+    assert_eq!(changed.paths, vec![String::from("pr.rs")]);
+    assert!(changed.reason.is_none());
+}
+
+#[test]
 fn git_changed_files_treats_clean_status_as_success() {
     let repo = temp_dir("changed-files-clean");
     run_git(&repo, &["init", "--initial-branch=main"]);

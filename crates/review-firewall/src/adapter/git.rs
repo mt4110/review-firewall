@@ -133,14 +133,34 @@ pub fn fallback_base_branch(repo_root: &Path) -> StringProbe {
         }
     }
 
-    for candidate in ["main", "master"] {
-        if ref_exists(repo_root, &format!("origin/{candidate}")) || ref_exists(repo_root, candidate)
-        {
+    let candidates = ["main", "master", "develop", "development", "trunk"];
+    for candidate in candidates {
+        if ref_exists(repo_root, &format!("origin/{candidate}")) {
             return StringProbe {
                 value: candidate.to_owned(),
                 reason: None,
             };
         }
+    }
+
+    for candidate in candidates {
+        if ref_exists(repo_root, candidate) {
+            return StringProbe {
+                value: candidate.to_owned(),
+                reason: None,
+            };
+        }
+    }
+
+    let current_branch = current_branch(repo_root).value;
+    if let Some(branch) =
+        infer_unique_branch(repo_root, "refs/remotes/origin", Some(&current_branch))
+            .or_else(|| infer_unique_branch(repo_root, "refs/heads", Some(&current_branch)))
+    {
+        return StringProbe {
+            value: branch,
+            reason: None,
+        };
     }
 
     StringProbe {
@@ -276,6 +296,57 @@ fn ref_exists(repo_root: &Path, reference: &str) -> bool {
         ],
     );
     output.success
+}
+
+fn infer_unique_branch(
+    repo_root: &Path,
+    namespace: &str,
+    current_branch: Option<&str>,
+) -> Option<String> {
+    let output = run_process(
+        repo_root,
+        "git",
+        &[
+            String::from("for-each-ref"),
+            String::from("--format=%(refname:short)"),
+            namespace.to_owned(),
+        ],
+    );
+    if !output.success {
+        return None;
+    }
+
+    let current_branch = current_branch.filter(|value| !value.trim().is_empty());
+    let mut branches = Vec::new();
+    for reference in output.stdout.lines().map(str::trim) {
+        let Some(branch) = normalize_branch_reference(reference) else {
+            continue;
+        };
+        if current_branch == Some(branch.as_str()) {
+            continue;
+        }
+        if !branches.iter().any(|existing| existing == &branch) {
+            branches.push(branch);
+        }
+    }
+
+    if branches.len() == 1 {
+        branches.pop()
+    } else {
+        None
+    }
+}
+
+fn normalize_branch_reference(reference: &str) -> Option<String> {
+    let branch = reference
+        .strip_prefix("origin/")
+        .unwrap_or(reference)
+        .trim();
+    if branch.is_empty() || branch == "HEAD" {
+        None
+    } else {
+        Some(branch.to_owned())
+    }
 }
 
 fn summarize_reasons(reasons: &[String]) -> String {
