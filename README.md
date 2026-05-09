@@ -114,8 +114,8 @@ crates/
 When GitHub returns PR file data, that file list is authoritative.
 Local git changed files are used only as a fallback when PR file data is unavailable.
 
-For v0.1, top-level PR issue comments are preserved as one chronological PR-conversation thread unless the input carries an explicit shared thread id.
-This preserves PR-level back-and-forth while keeping hosted topic inference out of v0.1.
+For v0.1, top-level PR issue comments are kept as independent pseudo-threads unless the input carries an explicit shared thread id.
+This avoids mixing unrelated PR-level conversations into one escalation signal while keeping hosted topic inference out of v0.1.
 
 ## Development
 

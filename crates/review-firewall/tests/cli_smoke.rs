@@ -276,11 +276,15 @@ fn smoke_flow_creates_all_artifacts() {
         assert!(run_dir.join(file).exists(), "missing artifact: {file}");
     }
 
+    let scan = fs::read_to_string(run_dir.join("scan.json")).expect("scan");
     let gate = fs::read_to_string(run_dir.join("gate.json")).expect("gate");
     let escalation = fs::read_to_string(run_dir.join("escalation.md")).expect("escalation");
+    assert!(scan.contains(r#""thread_id": "issue:21""#));
+    assert!(scan.contains(r#""thread_id": "issue:22""#));
+    assert!(!scan.contains("issue:conversation"));
     assert!(gate.contains(r#""status": "OK""#));
     assert!(gate.contains(r#""residual_blockers""#));
-    assert!(escalation.contains("# RFC Candidate"));
+    assert!(escalation.contains("No ADR/RFC candidates were found."));
 }
 
 #[test]

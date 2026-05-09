@@ -2,8 +2,6 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::domain::{CommentRecord, ReviewThread};
 
-const ISSUE_CONVERSATION_THREAD_ID: &str = "issue:conversation";
-
 pub fn normalize_path(input: &str) -> String {
     input.replace('\\', "/")
 }
@@ -118,10 +116,10 @@ fn build_issue_comment_threads(
 
 fn issue_comment_thread_id(comment: &CommentRecord) -> String {
     let Some(thread_id) = fallback_thread_id(comment) else {
-        return ISSUE_CONVERSATION_THREAD_ID.to_owned();
+        return format!("issue:{}", comment.comment_id);
     };
     if thread_id == comment.comment_id || thread_id == format!("issue:{}", comment.comment_id) {
-        ISSUE_CONVERSATION_THREAD_ID.to_owned()
+        format!("issue:{}", comment.comment_id)
     } else {
         thread_id
     }
@@ -335,7 +333,7 @@ mod tests {
     }
 
     #[test]
-    fn groups_issue_comments_without_explicit_thread_id_as_pr_conversation() {
+    fn keeps_issue_comments_without_explicit_thread_id_as_pseudo_threads() {
         let issue_comments = vec![
             CommentRecord {
                 comment_id: "10".into(),
@@ -365,10 +363,13 @@ mod tests {
 
         let threads = build_conversation_threads(&[], &issue_comments);
 
-        assert_eq!(threads.len(), 1);
-        assert_eq!(threads[0].thread_id, "issue:conversation");
+        assert_eq!(threads.len(), 2);
+        assert_eq!(threads[0].thread_id, "issue:10");
         assert_eq!(threads[0].roundtrips, 0);
-        assert_eq!(threads[0].participants, vec!["reviewer", "author"]);
+        assert_eq!(threads[0].participants, vec!["reviewer"]);
+        assert_eq!(threads[1].thread_id, "issue:11");
+        assert_eq!(threads[1].roundtrips, 0);
+        assert_eq!(threads[1].participants, vec!["author"]);
     }
 
     #[test]
