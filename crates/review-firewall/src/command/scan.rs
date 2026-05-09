@@ -113,50 +113,16 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                 }
 
                 if changed_files.is_empty() || changed_files_partial {
-                    changed_files = if changed_files_partial {
-                        let head_check =
-                            local_head_matches_pr_head(&repo_root.path, pr.head_oid.as_deref());
-                        merge_probe_reason(
-                            &mut status,
-                            &mut reason,
-                            &mut warnings,
-                            head_check.reason,
-                            Status::Partial,
-                        );
-                        if head_check.value {
-                            let base_changed = git::changed_files_against_base(
-                                &repo_root.path,
-                                pr.base_branch.as_deref(),
-                            );
-                            let base_reason = base_changed.reason.clone();
-                            let paths = base_changed.paths;
-                            merge_probe_reason(
-                                &mut status,
-                                &mut reason,
-                                &mut warnings,
-                                base_reason,
-                                Status::Partial,
-                            );
-                            supplement_changed_files_from_base_diff(changed_files, paths, true)
-                        } else {
-                            supplement_changed_files_from_base_diff(
-                                changed_files,
-                                Vec::new(),
-                                false,
-                            )
-                        }
-                    } else {
-                        let local_changed =
-                            git::changed_files(&repo_root.path, pr.base_branch.as_deref());
-                        merge_probe_reason(
-                            &mut status,
-                            &mut reason,
-                            &mut warnings,
-                            local_changed.reason.clone(),
-                            Status::Partial,
-                        );
-                        fallback_changed_files_from_local(changed_files, local_changed.paths)
-                    };
+                    let base_paths = verified_base_changed_files(
+                        &repo_root.path,
+                        pr.base_branch.as_deref(),
+                        pr.head_oid.as_deref(),
+                        &mut status,
+                        &mut reason,
+                        &mut warnings,
+                        &mut partial_sources,
+                    );
+                    changed_files = merge_changed_files(changed_files, &base_paths);
                 }
 
                 match gh::review_comments(
@@ -239,52 +205,16 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     Some(pr.author.as_str()),
                 );
             } else if pr.number.is_some() && repository.identity.is_none() {
-                if changed_files.is_empty() {
-                    let local_changed =
-                        git::changed_files(&repo_root.path, pr.base_branch.as_deref());
-                    changed_files =
-                        fallback_changed_files_from_local(changed_files, local_changed.paths);
-                    merge_probe_reason(
-                        &mut status,
-                        &mut reason,
-                        &mut warnings,
-                        local_changed.reason,
-                        Status::Partial,
-                    );
-                } else {
-                    let head_check =
-                        local_head_matches_pr_head(&repo_root.path, pr.head_oid.as_deref());
-                    if head_check.reason.is_some() {
-                        partial_sources.push(String::from("changed_files"));
-                    }
-                    merge_probe_reason(
-                        &mut status,
-                        &mut reason,
-                        &mut warnings,
-                        head_check.reason,
-                        Status::Partial,
-                    );
-                    if head_check.value {
-                        let base_changed = git::changed_files_against_base(
-                            &repo_root.path,
-                            pr.base_branch.as_deref(),
-                        );
-                        if base_changed.reason.is_some() {
-                            partial_sources.push(String::from("changed_files"));
-                        }
-                        let base_reason = base_changed.reason.clone();
-                        let paths = base_changed.paths;
-                        merge_probe_reason(
-                            &mut status,
-                            &mut reason,
-                            &mut warnings,
-                            base_reason,
-                            Status::Partial,
-                        );
-                        changed_files =
-                            supplement_changed_files_from_base_diff(changed_files, paths, true);
-                    }
-                }
+                let base_paths = verified_base_changed_files(
+                    &repo_root.path,
+                    pr.base_branch.as_deref(),
+                    pr.head_oid.as_deref(),
+                    &mut status,
+                    &mut reason,
+                    &mut warnings,
+                    &mut partial_sources,
+                );
+                changed_files = merge_changed_files(changed_files, &base_paths);
                 partial_sources.push(String::from("repository_identity"));
                 merge_probe_reason(
                     &mut status,
@@ -526,10 +456,7 @@ fn merge_changed_files(mut primary: Vec<String>, supplemental: &[String]) -> Vec
     primary
 }
 
-fn fallback_changed_files_from_local(primary: Vec<String>, local: Vec<String>) -> Vec<String> {
-    if primary.is_empty() { local } else { primary }
-}
-
+#[cfg(test)]
 fn supplement_changed_files_from_base_diff(
     primary: Vec<String>,
     base_diff: Vec<String>,
@@ -540,6 +467,36 @@ fn supplement_changed_files_from_base_diff(
     } else {
         primary
     }
+}
+
+fn verified_base_changed_files(
+    repo_root: &Path,
+    base_branch: Option<&str>,
+    pr_head_oid: Option<&str>,
+    status: &mut Status,
+    reason: &mut Option<String>,
+    warnings: &mut Vec<String>,
+    partial_sources: &mut Vec<String>,
+) -> Vec<String> {
+    let head_check = local_head_matches_pr_head(repo_root, pr_head_oid);
+    if head_check.reason.is_some() {
+        partial_sources.push(String::from("changed_files"));
+    }
+    let head_matches = head_check.value;
+    merge_probe_reason(status, reason, warnings, head_check.reason, Status::Partial);
+
+    if !head_matches {
+        return Vec::new();
+    }
+
+    let base_changed = git::changed_files_against_base(repo_root, base_branch);
+    if base_changed.reason.is_some() {
+        partial_sources.push(String::from("changed_files"));
+    }
+    let base_reason = base_changed.reason.clone();
+    let paths = base_changed.paths;
+    merge_probe_reason(status, reason, warnings, base_reason, Status::Partial);
+    paths
 }
 
 fn local_head_matches_pr_head(repo_root: &Path, pr_head_oid: Option<&str>) -> BoolProbe {
@@ -585,15 +542,6 @@ fn short_oid(value: &str) -> String {
 #[allow(dead_code)]
 pub fn merge_changed_files_for_tests(primary: Vec<String>, supplemental: &[String]) -> Vec<String> {
     merge_changed_files(primary, supplemental)
-}
-
-#[cfg(test)]
-#[allow(dead_code)]
-pub fn fallback_changed_files_from_local_for_tests(
-    primary: Vec<String>,
-    local: Vec<String>,
-) -> Vec<String> {
-    fallback_changed_files_from_local(primary, local)
 }
 
 #[cfg(test)]

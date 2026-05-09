@@ -49,17 +49,14 @@ fn codeowners_locations(repo_root: &Path) -> [std::path::PathBuf; 3] {
 }
 
 fn parse_rule(line: &str) -> Option<CodeownerRule> {
-    let trimmed = line
-        .split_once('#')
-        .map(|(rule, _)| rule)
-        .unwrap_or(line)
-        .trim();
+    let trimmed = line.trim();
     if trimmed.is_empty() || trimmed.starts_with('#') {
         return None;
     }
     let (pattern, owners_text) = split_pattern_and_owners(trimmed)?;
     let owners = owners_text
         .split_whitespace()
+        .take_while(|value| !value.starts_with('#'))
         .map(ToOwned::to_owned)
         .collect::<Vec<_>>();
     if owners.is_empty() {

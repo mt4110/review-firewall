@@ -122,6 +122,25 @@ fn codeowners_detection_preserves_escaped_spaces_in_patterns() {
 }
 
 #[test]
+fn codeowners_detection_preserves_hashes_inside_patterns() {
+    let repo = temp_dir("codeowners-hash-pattern");
+    fs::write(
+        repo.join("CODEOWNERS"),
+        "docs/#faq.md @docs-owner\n/apps/* @platform # app owners\n# comment only\n",
+    )
+    .expect("write root");
+
+    let loaded = io::codeowners::load(&repo);
+
+    assert!(loaded.found);
+    assert_eq!(loaded.rules.len(), 2);
+    assert_eq!(loaded.rules[0].pattern, "docs/#faq.md");
+    assert_eq!(loaded.rules[0].owners, vec![String::from("@docs-owner")]);
+    assert_eq!(loaded.rules[1].pattern, "/apps/*");
+    assert_eq!(loaded.rules[1].owners, vec![String::from("@platform")]);
+}
+
+#[test]
 fn codeowners_detection_uses_root_then_docs_fallbacks() {
     let root_repo = temp_dir("codeowners-root");
     fs::write(root_repo.join("CODEOWNERS"), "/src/* @root-owner\n").expect("write root");
@@ -620,22 +639,7 @@ fn scan_changed_files_supplements_pr_file_list_with_api_files() {
 }
 
 #[test]
-fn scan_changed_files_use_local_diff_only_when_pr_files_are_unavailable() {
-    let kept = command::scan::fallback_changed_files_from_local_for_tests(
-        vec![String::from("src/pr.rs")],
-        vec![String::from("src/local.rs")],
-    );
-    let fallback = command::scan::fallback_changed_files_from_local_for_tests(
-        Vec::new(),
-        vec![String::from("src/local.rs")],
-    );
-
-    assert_eq!(kept, vec![String::from("src/pr.rs")]);
-    assert_eq!(fallback, vec![String::from("src/local.rs")]);
-}
-
-#[test]
-fn scan_changed_files_supplements_pr_file_list_with_local_diff_when_head_matches() {
+fn scan_changed_files_supplements_pr_file_list_with_base_diff_when_head_matches() {
     let recovered = command::scan::supplement_changed_files_from_base_diff_for_tests(
         vec![String::from("src/pr.rs")],
         vec![String::from("src/local.rs"), String::from("src/pr.rs")],
