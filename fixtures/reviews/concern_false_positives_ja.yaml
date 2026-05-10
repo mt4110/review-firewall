@@ -1,0 +1,369 @@
+version: 1
+kind: synthetic_concern_false_positive_cases
+language: ja
+notes:
+- concern 抽出の過剰反応を防ぐための synthetic fixtures。
+- 全件 non-blocking 想定で、expected.concern は null。
+- キーワードが concern 語に見えても、この文脈では concern に昇格してはいけないケースを集めた。
+- noise_ja / true_blockers_ja に加えて使うことで、extract_concern の語彙追加による overfitting を検知しやすくする。
+cases:
+- id: concern_fp_001
+  category: correctness_fp
+  looks_like_concern_ja: correctness
+  trigger_token_ja: panic
+  comment_ja: panic という単語が強いので README ではもう少し柔らかい表現にしたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 文言調整であり runtime correctness の指摘ではない。
+- id: concern_fp_002
+  category: correctness_fp
+  looks_like_concern_ja: correctness
+  trigger_token_ja: bug
+  comment_ja: bug という語を issue タイトルに入れると強すぎるので別表現にしませんか。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: ラベル/表現の話。
+- id: concern_fp_003
+  category: correctness_fp
+  looks_like_concern_ja: correctness
+  trigger_token_ja: 'null'
+  comment_ja: null の説明を docs では日本語で補足したいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 注釈の話であり null handling の不具合指摘ではない。
+- id: concern_fp_004
+  category: correctness_fp
+  looks_like_concern_ja: correctness
+  trigger_token_ja: retry
+  comment_ja: retry の節、README だと前に持ってきた方が流れがいいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 章構成の話。
+- id: concern_fp_005
+  category: correctness_fp
+  looks_like_concern_ja: correctness
+  trigger_token_ja: fallback
+  comment_ja: fallback という用語が曖昧なので言い換えたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 用語の曖昧さであり failure mode ではない。
+- id: concern_fp_006
+  category: correctness_fp
+  looks_like_concern_ja: correctness
+  trigger_token_ja: overflow
+  comment_ja: overflow の説明例、数字が大きすぎて読みづらいです。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 例の見た目の問題。
+- id: concern_fp_007
+  category: performance_fp
+  looks_like_concern_ja: performance
+  trigger_token_ja: sort
+  comment_ja: この結果、sort されている方が見やすいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 並び順の好みであり性能 concern ではない。
+- id: concern_fp_008
+  category: performance_fp
+  looks_like_concern_ja: performance
+  trigger_token_ja: lock
+  comment_ja: このロジック、ロック解除の説明コメントを足してほしいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 説明コメント要求であり lock contention の話ではない。
+- id: concern_fp_009
+  category: performance_fp
+  looks_like_concern_ja: performance
+  trigger_token_ja: clone
+  comment_ja: clone というメソッド名が紛らわしいので rename したいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 命名の話。
+- id: concern_fp_010
+  category: performance_fp
+  looks_like_concern_ja: performance
+  trigger_token_ja: cache
+  comment_ja: cache って名前が広すぎるので field 名を見直したいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 命名問題であり cache 設計の性能議論ではない。
+- id: concern_fp_011
+  category: performance_fp
+  looks_like_concern_ja: performance
+  trigger_token_ja: alloc
+  comment_ja: alloc という略語より allocation と書いた方が親切です。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 語の展開であり性能根拠ではない。
+- id: concern_fp_012
+  category: performance_fp
+  looks_like_concern_ja: performance
+  trigger_token_ja: throughput
+  comment_ja: throughput って単語、PM 向けには分かりにくいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 読み手配慮の話。
+- id: concern_fp_013
+  category: security_fp
+  looks_like_concern_ja: security
+  trigger_token_ja: header
+  comment_ja: header の並び順を README と揃えてください。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 文書整形であり秘密情報漏えいの話ではない。
+- id: concern_fp_014
+  category: security_fp
+  looks_like_concern_ja: security
+  trigger_token_ja: origin
+  comment_ja: この設計の origin を issue に書いておいてほしいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 由来の意味であって CORS ではない。
+- id: concern_fp_015
+  category: security_fp
+  looks_like_concern_ja: security
+  trigger_token_ja: token
+  comment_ja: token という名前、domain 的には voucher の方が近い気がします。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 命名問題であり認証 token ではない。
+- id: concern_fp_016
+  category: security_fp
+  looks_like_concern_ja: security
+  trigger_token_ja: secret
+  comment_ja: secret という言葉が強すぎるので UI 文言を変えたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 表現調整。
+- id: concern_fp_017
+  category: security_fp
+  looks_like_concern_ja: security
+  trigger_token_ja: permission
+  comment_ja: permission という column 名、権限というより設定値では？
+  expected:
+    type: question
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 命名の確認。
+- id: concern_fp_018
+  category: security_fp
+  looks_like_concern_ja: security
+  trigger_token_ja: redirect
+  comment_ja: redirect 後の画面遷移図を図にしてほしいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 図解要求であり open redirect の指摘ではない。
+- id: concern_fp_019
+  category: operability_fp
+  looks_like_concern_ja: operability
+  trigger_token_ja: owner
+  comment_ja: owner が誰か README の先頭に書いておくと助かります。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 情報整理であり runbook/運用 blocker ではない。
+- id: concern_fp_020
+  category: operability_fp
+  looks_like_concern_ja: operability
+  trigger_token_ja: runbook
+  comment_ja: runbook という単語、社内では playbook 呼びなので合わせたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 用語統一。
+- id: concern_fp_021
+  category: operability_fp
+  looks_like_concern_ja: operability
+  trigger_token_ja: rollback
+  comment_ja: rollback の説明が長いので折りたたみたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 文書レイアウト。
+- id: concern_fp_022
+  category: operability_fp
+  looks_like_concern_ja: operability
+  trigger_token_ja: metric
+  comment_ja: metric 名の語順が気になります。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 命名の好み。
+- id: concern_fp_023
+  category: operability_fp
+  looks_like_concern_ja: operability
+  trigger_token_ja: timeout
+  comment_ja: timeout って言葉が分かりにくいので日本語注釈を入れたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 注釈追加の提案。
+- id: concern_fp_024
+  category: operability_fp
+  looks_like_concern_ja: operability
+  trigger_token_ja: log
+  comment_ja: log の章、README だと後ろに移したいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 章配置の話。
+- id: concern_fp_025
+  category: api_fp
+  looks_like_concern_ja: api
+  trigger_token_ja: schema
+  comment_ja: schema という単語が固いので docs では形式に言い換えたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 用語調整であり API 契約変更ではない。
+- id: concern_fp_026
+  category: api_fp
+  looks_like_concern_ja: api
+  trigger_token_ja: contract
+  comment_ja: contract って言葉、非エンジニアには誤解されるので別表現にしませんか。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 表現の問題。
+- id: concern_fp_027
+  category: api_fp
+  looks_like_concern_ja: api
+  trigger_token_ja: response
+  comment_ja: response のサンプル JSON、整形だけもう少し見やすくしたいです。
+  expected:
+    type: nit
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 見た目の改善。
+- id: concern_fp_028
+  category: api_fp
+  looks_like_concern_ja: api
+  trigger_token_ja: endpoint
+  comment_ja: endpoint という単語に脚注を入れてください。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 注釈要望。
+- id: concern_fp_029
+  category: api_fp
+  looks_like_concern_ja: api
+  trigger_token_ja: status code
+  comment_ja: status code の表、README では上に持ってきたいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 表の位置調整。
+- id: concern_fp_030
+  category: api_fp
+  looks_like_concern_ja: api
+  trigger_token_ja: payload
+  comment_ja: payload という語が分かりにくいので本文で説明を足したいです。
+  expected:
+    type: suggestion
+    blocker: false
+    concern: null
+    reply: decline
+    escalate: stay_in_pr
+  reason_ja: 用語説明。

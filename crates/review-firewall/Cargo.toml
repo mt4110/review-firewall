@@ -1,0 +1,15 @@
+[package]
+name = "review-firewall"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "review-firewall"
+path = "src/main.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+time.workspace = true
+rf-core = { path = "../rf-core" }

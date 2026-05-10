@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ScanArtifact",
+  "type": "object",
+  "required": ["status", "pr", "files_changed", "review_comments", "threads", "codeowners_found", "policy_found", "product_boundary"],
+  "properties": {
+    "status": { "enum": ["OK", "PARTIAL", "ERROR"] },
+    "reason": { "type": "string" },
+    "pr": {
+      "type": "object",
+      "required": ["number", "title"],
+      "properties": {
+        "number": { "type": ["integer", "string", "null"] },
+        "title": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "files_changed": { "type": "integer", "minimum": 0 },
+    "review_comments": { "type": "integer", "minimum": 0 },
+    "threads": { "type": "integer", "minimum": 0 },
+    "codeowners_found": { "type": "boolean" },
+    "policy_found": { "type": "boolean" },
+    "product_boundary": {
+      "type": "object",
+      "required": [
+        "category",
+        "consumes_existing_review_comments",
+        "generates_ai_reviews",
+        "posts_pr_comments",
+        "uses_llm_for_core_judgment"
+      ],
+      "properties": {
+        "category": { "const": "post_review_triage_firewall" },
+        "consumes_existing_review_comments": { "const": true },
+        "generates_ai_reviews": { "const": false },
+        "posts_pr_comments": { "const": false },
+        "uses_llm_for_core_judgment": { "const": false }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

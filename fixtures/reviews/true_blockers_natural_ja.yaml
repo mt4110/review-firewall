@@ -1,0 +1,345 @@
+version: 1
+kind: synthetic_true_blockers_natural_cases
+language: ja
+notes:
+- 自然文寄りの true blocker fixtures。
+- 教科書的な `failure:` / `evidence:` 形式ではなく、レビューコメントっぽい文体に寄せている。
+- 全件、expected.blocker == true / expected.concern != null。
+- noise_exact や concern_false_positives と混ぜず、natural blocker 側の境界用に使う。
+cases:
+- id: natural_blocker_001
+  category: correctness
+  comment_ja: 今回の PR だと `status=partial` のときだけ `items` が返らないので、既存クライアントが必須前提で panic します。ここは blocker です。
+  expected:
+    type: blocker
+    blocker: true
+    concern: correctness
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: partial 応答で既存クライアントが panic する。
+  evidence_ja: '`partial` 分岐だけ `items` を返しておらず、既存 contract test の前提とズレる。'
+  impact_on_pr_ja: 今回の PR で API 互換が壊れる。
+  reason_ja: 公開契約の破壊。
+  alternative_ja: partial でも空配列を返す。
+- id: natural_blocker_002
+  category: correctness
+  comment_ja: 今回の PR だとここが `unwrap()` になっているので、設定未投入環境は起動時に panic します。
+  expected:
+    type: blocker
+    blocker: true
+    concern: correctness
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 設定未投入環境で起動時 panic。
+  evidence_ja: デフォルト値や graceful error がなく、`unwrap()` が追加されている。
+  impact_on_pr_ja: 今回の PR を merge すると特定環境で起動できない。
+  reason_ja: panic 経路。
+  alternative_ja: 明示エラー返却かデフォルト値を入れる。
+- id: natural_blocker_003
+  category: correctness
+  comment_ja: 今回の PR だと既存行の backfill がないまま `NOT NULL` が入るので、旧データ更新が DB エラーで失敗します。
+  expected:
+    type: blocker
+    blocker: true
+    concern: correctness
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 旧レコード更新時に DB エラーになる。
+  evidence_ja: NOT NULL 制約が追加されている一方で既存データの埋め戻しがない。
+  impact_on_pr_ja: 今回の migration 適用で既存データが壊れる。
+  reason_ja: 既存データ整合性の破壊。
+  alternative_ja: backfill を追加する。
+- id: natural_blocker_004
+  category: correctness
+  comment_ja: 今回の PR だと UTC 保存の値を `local time` で比較しているので、期限判定が環境によって誤動作します。
+  expected:
+    type: blocker
+    blocker: true
+    concern: correctness
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 期限切れ/未期限切れの判定が誤る。
+  evidence_ja: '`Local::now()` 比較に変わっていて、既存データは UTC 前提。'
+  impact_on_pr_ja: 今回の PR で期限判定ロジックが変わる。
+  reason_ja: 時刻比較バグ。
+  alternative_ja: UTC 比較に戻す。
+- id: natural_blocker_005
+  category: correctness
+  comment_ja: 今回の PR だと `loop` に上限がないので、恒久失敗で無限リトライになって処理結果が返られません。
+  expected:
+    type: blocker
+    blocker: true
+    concern: correctness
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 恒久障害時にジョブが無限リトライする。
+  evidence_ja: '`loop` の break 条件が成功時だけで、上限試行回数がない。'
+  impact_on_pr_ja: 今回のバックグラウンド処理が詰まる。
+  reason_ja: 無限リトライ。
+  alternative_ja: 最大試行回数を入れる。
+- id: natural_blocker_006
+  category: correctness
+  comment_ja: 今回の PR だと write のあとに `cache` を落としていないので、直後の read で stale な古い値を返します。
+  expected:
+    type: blocker
+    blocker: true
+    concern: correctness
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 更新直後に stale read が発生する。
+  evidence_ja: 新しい write path に invalidation が入っていない。
+  impact_on_pr_ja: 今回の PR で read-after-write 一貫性が崩れる。
+  reason_ja: 整合性問題。
+  alternative_ja: 成功後に invalidate する。
+- id: natural_blocker_007
+  category: security
+  comment_ja: 今回の PR だと `Authorization` ヘッダをそのまま info ログに出しているので、トークンが運用ログに漏れる状態です。ここは止めたいです。
+  expected:
+    type: blocker
+    blocker: true
+    concern: security
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 資格情報がログに残る。
+  evidence_ja: request headers 丸ごと出力の差分が入っている。
+  impact_on_pr_ja: 今回の PR でログから秘密情報が漏れる。
+  reason_ja: 秘密情報漏えい。
+  alternative_ja: マスクまたは除外する。
+- id: natural_blocker_008
+  category: security
+  comment_ja: 今回の PR だと `format!` で SQL を組んでいるので、ユーザー入力がそのまま入ってデータが漏れる状態です。
+  expected:
+    type: blocker
+    blocker: true
+    concern: security
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: SQL injection で任意クエリ混入が可能。
+  evidence_ja: prepared statement から `format!` ベースに変わっている。
+  impact_on_pr_ja: 今回の PR で入力経路が脆弱になる。
+  reason_ja: SQL injection。
+  alternative_ja: プレースホルダに戻す。
+- id: natural_blocker_009
+  category: security
+  comment_ja: 今回の PR だとユーザー指定のファイル名をそのまま join していて、`../` を通せるので path traversal になって秘密情報が漏れる状態です。
+  expected:
+    type: blocker
+    blocker: true
+    concern: security
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: path traversal で想定外パスに書き込める。
+  evidence_ja: canonicalize も allowlist もなく `base.join(user_input)` だけになっている。
+  impact_on_pr_ja: 今回の export 機能が危険になる。
+  reason_ja: path traversal。
+  alternative_ja: ファイル名を検証する。
+- id: natural_blocker_010
+  category: security
+  comment_ja: 今回の PR だと `HTML` をサニタイズせずにそのまま描画しているので、XSS が成立して画面が壊れます。
+  expected:
+    type: blocker
+    blocker: true
+    concern: security
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: script 実行でセッションや画面操作が奪われる。
+  evidence_ja: render path に sanitization がなく、ユーザー入力が HTML として流れている。
+  impact_on_pr_ja: 今回の UI 変更が攻撃面になる。
+  reason_ja: XSS。
+  alternative_ja: sanitize するか plain text 表示にする。
+- id: natural_blocker_011
+  category: security
+  comment_ja: 今回の PR だと一般ユーザーでも `delete` が通る条件に変わっていて、認可境界が壊れます。
+  expected:
+    type: blocker
+    blocker: true
+    concern: security
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 権限外削除が可能になる。
+  evidence_ja: role check が `!= guest` 側に緩んでいる。
+  impact_on_pr_ja: 今回の PR で authorization bypass が起きる。
+  reason_ja: 認可不備。
+  alternative_ja: admin 明示判定に戻す。
+- id: natural_blocker_012
+  category: performance
+  comment_ja: 今回の PR だとこのループ内で毎回 DB を引くので `N+1` になり、一覧件数が増えると遅くなる状態です。
+  expected:
+    type: blocker
+    blocker: true
+    concern: performance
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 件数増加で一覧 API が急激に遅くなる。
+  evidence_ja: for ループの中で `find_by_id` を都度呼んでいる。
+  impact_on_pr_ja: 今回の一覧経路が N+1 になる。
+  reason_ja: N+1 query。
+  alternative_ja: join か batched fetch にする。
+- id: natural_blocker_013
+  category: performance
+  comment_ja: 今回の PR だとリクエストハンドラの中で `sync read` をしているので、高負荷時に worker が詰まる状態です。
+  expected:
+    type: blocker
+    blocker: true
+    concern: performance
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 同時接続時に worker がブロックされる。
+  evidence_ja: hot path に sync read/write が入っている。
+  impact_on_pr_ja: 今回の API が高負荷で詰まりやすくなる。
+  reason_ja: 同期I/O混入。
+  alternative_ja: 非同期化または別ジョブ化する。
+- id: natural_blocker_014
+  category: performance
+  comment_ja: 今回の PR だとこの `cache` は eviction が無いので、稼働時間に比例してメモリが増えて最終的に落ちる経路になります。
+  expected:
+    type: blocker
+    blocker: true
+    concern: performance
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 長時間稼働でメモリ肥大化する。
+  evidence_ja: 上限や TTL なしで HashMap に積み続ける実装になっている。
+  impact_on_pr_ja: 今回の常駐プロセスで OOM リスクがある。
+  reason_ja: 無制限キャッシュ。
+  alternative_ja: サイズ上限か TTL を入れる。
+- id: natural_blocker_015
+  category: performance
+  comment_ja: 今回の PR だと毎回 10MB のバッファを `clone` しているので、トラフィックが乗ると CPU と alloc が増えて遅くなる状態です。
+  expected:
+    type: blocker
+    blocker: true
+    concern: performance
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: CPU と alloc が無駄に増える。
+  evidence_ja: 大きな blob を request ごとに clone している。
+  impact_on_pr_ja: 今回の新経路が高負荷時に重くなる。
+  reason_ja: 大容量 clone。
+  alternative_ja: 参照共有か streaming にする。
+- id: natural_blocker_016
+  category: performance
+  comment_ja: 今回の PR だと全件 `sort` してから上位 20 件だけ取っているので、データ量が増えると必要以上に遅くなる状態です。
+  expected:
+    type: blocker
+    blocker: true
+    concern: performance
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 不要な O(n log n) が発生する。
+  evidence_ja: full sort の後で先頭だけ切り出している。
+  impact_on_pr_ja: 今回のランキング処理がデータ量増で遅くなる。
+  reason_ja: 過剰 sort。
+  alternative_ja: partial selection を使う。
+- id: natural_blocker_017
+  category: operability
+  comment_ja: 今回の PR だと migration はありますが `rollback` 手順が無いので、失敗時に安全に戻せません。
+  expected:
+    type: blocker
+    blocker: true
+    concern: operability
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 障害時に切り戻し不能になる。
+  evidence_ja: forward migration だけで down 手順や runbook がない。
+  impact_on_pr_ja: 今回の DB 変更の運用リスクが高い。
+  reason_ja: rollback 不備。
+  alternative_ja: down migration か rollback 手順を追加する。
+- id: natural_blocker_018
+  category: operability
+  comment_ja: 今回の PR だと新しい failure path に `メトリクス` が無いので、失敗しても検知できません。
+  expected:
+    type: blocker
+    blocker: true
+    concern: operability
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 障害検知が遅れる。
+  evidence_ja: success/failure metric が新分岐にない。
+  impact_on_pr_ja: 今回の rollout を安全に監視できない。
+  reason_ja: 観測不能。
+  alternative_ja: メトリクスを追加する。
+- id: natural_blocker_019
+  category: operability
+  comment_ja: 今回の PR だとこの `catch` で握りつぶして OK を返すので、失敗しても気づけません。
+  expected:
+    type: blocker
+    blocker: true
+    concern: operability
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 実際は失敗しているのに成功に見える。
+  evidence_ja: error を log only / ignore して return OK している。
+  impact_on_pr_ja: 今回の PR で silent failure が入る。
+  reason_ja: サイレント失敗。
+  alternative_ja: 明示エラーにする。
+- id: natural_blocker_020
+  category: operability
+  comment_ja: 今回の PR だと外部呼び出しに `timeout` が無いので、先方障害で worker がぶら下がります。
+  expected:
+    type: blocker
+    blocker: true
+    concern: operability
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: ハングで worker 枯渇が起こる。
+  evidence_ja: HTTP client call に timeout 設定がない。
+  impact_on_pr_ja: 今回の連携経路が詰まりうる。
+  reason_ja: timeout 不備。
+  alternative_ja: timeout と cancel を入れる。
+- id: natural_blocker_021
+  category: api
+  comment_ja: '今回の PR だと `total_count` をレスポンスから消しているので、公開 API の後方互換が壊れます。'
+  expected:
+    type: blocker
+    blocker: true
+    concern: api
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 既存クライアントが deserialize 失敗または表示崩れする。
+  evidence_ja: レスポンス schema から `total_count` が削除されている。
+  impact_on_pr_ja: 今回の PR で外部利用者が壊れる。
+  reason_ja: 後方互換性破壊。
+  alternative_ja: deprecated 期間を置く。
+- id: natural_blocker_022
+  category: api
+  comment_ja: '今回の PR で `userId` を `user_id` に変えるのは JSON 契約変更なので、既存クライアントが壊れます。'
+  expected:
+    type: blocker
+    blocker: true
+    concern: api
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 既存 SDK / クライアントが壊れる。
+  evidence_ja: serializer tag が変更されている。
+  impact_on_pr_ja: 今回の PR で JSON 契約が変わる。
+  reason_ja: wire format 変更。
+  alternative_ja: 互換 alias を残す。
+- id: natural_blocker_023
+  category: api
+  comment_ja: 今回の PR で見つからない場合の `404` を `200+empty` に変えると、呼び出し側の error handling が fail します。
+  expected:
+    type: blocker
+    blocker: true
+    concern: api
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 既存クライアントの error handling が動かなくなる。
+  evidence_ja: handler の return code が変更されている。
+  impact_on_pr_ja: 今回の PR で HTTP semantics が変わる。
+  reason_ja: status code 契約変更。
+  alternative_ja: 従来コードを維持する。
+- id: natural_blocker_024
+  category: api
+  comment_ja: 今回の PR で必須 `query param` を増やしていますが default 互換が無いので、既存呼び出しはそのまま 400 で fail します。
+  expected:
+    type: blocker
+    blocker: true
+    concern: api
+    reply: accept
+    escalate: stay_in_pr
+  failure_mode_ja: 既存クライアントが 400 で失敗する。
+  evidence_ja: required param が追加され、server default がない。
+  impact_on_pr_ja: 今回の PR で互換性のない必須化が起きる。
+  reason_ja: 必須化による互換破壊。
+  alternative_ja: default を用意する。

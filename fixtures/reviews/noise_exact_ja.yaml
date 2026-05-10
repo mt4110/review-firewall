@@ -1,0 +1,249 @@
+version: 1
+kind: synthetic_exact_non_blocking_cases
+language: ja
+notes:
+  - question / suggestion / nit / praise の exact boundary を固定するための synthetic fixtures。
+  - 全件 non-blocking で、expected.concern は null。
+  - concern-heavy な runtime 語彙は避け、classifier の非 blocker taxonomy だけを見る。
+  - broad-band の noise fixtures を補完するための sharp な exact-type fixture 群。
+cases:
+  - id: exact_001
+    category: question
+    comment_ja: このコメントアウトは今も必要ですか。
+    expected:
+      type: question
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 必要性の確認。
+  - id: exact_002
+    category: question
+    comment_ja: この補足、前提説明として残す意図で合っていますか。
+    expected:
+      type: question
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 意図確認。
+  - id: exact_003
+    category: question
+    comment_ja: この一文は読者向けの注意として置いていますか。
+    expected:
+      type: question
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 位置づけの確認。
+  - id: exact_004
+    category: question
+    comment_ja: ここは見出しを分ける想定ですか。
+    expected:
+      type: question
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 構成意図の確認。
+  - id: exact_005
+    category: question
+    comment_ja: この注記、あとで消す想定ではなく常設ですか。
+    expected:
+      type: question
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 残置意図の確認。
+  - id: exact_006
+    category: question
+    comment_ja: この例は実装者向けの例として書いていますか。
+    expected:
+      type: question
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 対象読者の確認。
+  - id: exact_007
+    category: suggestion
+    comment_ja: この段落は二文に分けたいです。
+    expected:
+      type: suggestion
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 読みやすさの提案。
+  - id: exact_008
+    category: suggestion
+    comment_ja: 冒頭に結論を一行足してほしいです。
+    expected:
+      type: suggestion
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 導入改善の提案。
+  - id: exact_009
+    category: suggestion
+    comment_ja: 用語はこの節だけでも統一したいです。
+    expected:
+      type: suggestion
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 表現統一の提案。
+  - id: exact_010
+    category: suggestion
+    comment_ja: 例を一つ先に置きたいです。
+    expected:
+      type: suggestion
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 構成改善の提案。
+  - id: exact_011
+    category: suggestion
+    comment_ja: この注記は脚注に寄せた方が本文が軽く見えます。
+    expected:
+      type: suggestion
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 配置変更の提案。
+  - id: exact_012
+    category: suggestion
+    comment_ja: 最後の一文は別段落に分けたいです。
+    expected:
+      type: suggestion
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 段落整理の提案。
+  - id: exact_013
+    category: nit
+    comment_ja: "nit: 句点の打ち方だけそろえたいです。"
+    expected:
+      type: nit
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 微小な表記修正。
+  - id: exact_014
+    category: nit
+    comment_ja: "typo: 「できる」を「できます」に直したいです。"
+    expected:
+      type: nit
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: typo 修正。
+  - id: exact_015
+    category: nit
+    comment_ja: "format: 箇条書きの字下げだけ合わせたいです。"
+    expected:
+      type: nit
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: format 修正。
+  - id: exact_016
+    category: nit
+    comment_ja: "style: かぎ括弧は全角にそろえたいです。"
+    expected:
+      type: nit
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: style 修正。
+  - id: exact_017
+    category: nit
+    comment_ja: "nits: 空行を一つ減らしたいです。"
+    expected:
+      type: nit
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 微小な整形。
+  - id: exact_018
+    category: nit
+    comment_ja: "small: この注記は括弧を外すだけで十分そうです。"
+    expected:
+      type: nit
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: 小さな表記修正。
+  - id: exact_019
+    category: praise
+    comment_ja: LGTM です。
+    expected:
+      type: praise
+      blocker: false
+      concern: null
+      reply: accept
+      escalate: stay_in_pr
+    reason_ja: 明示的な承認。
+  - id: exact_020
+    category: praise
+    comment_ja: 良さそうです。
+    expected:
+      type: praise
+      blocker: false
+      concern: null
+      reply: accept
+      escalate: stay_in_pr
+    reason_ja: 短い好意評価。
+  - id: exact_021
+    category: praise
+    comment_ja: good catch です。
+    expected:
+      type: praise
+      blocker: false
+      concern: null
+      reply: accept
+      escalate: stay_in_pr
+    reason_ja: 明示的な称賛。
+  - id: exact_022
+    category: praise
+    comment_ja: nice です。
+    expected:
+      type: praise
+      blocker: false
+      concern: null
+      reply: accept
+      escalate: stay_in_pr
+    reason_ja: 短い称賛。
+  - id: exact_023
+    category: praise
+    comment_ja: clean で読みやすいです。
+    expected:
+      type: praise
+      blocker: false
+      concern: null
+      reply: accept
+      escalate: stay_in_pr
+    reason_ja: 仕上がりへの称賛。
+  - id: exact_024
+    category: praise
+    comment_ja: LGTM です。
+    expected:
+      type: praise
+      blocker: false
+      concern: null
+      reply: accept
+      escalate: stay_in_pr
+    reason_ja: 説明品質への称賛。
