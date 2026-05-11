@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use rf_core::build_report_markdown;
-use rf_core::domain::{DraftReplyArtifact, GateArtifact, ScanArtifact, Status};
+use rf_core::domain::{
+    DataCoverage, DraftReplyArtifact, GateArtifact, ReviewSignal, ScanArtifact, Status,
+};
+use rf_core::{ReportHeader, build_report_markdown};
 use serde::de::DeserializeOwned;
 
 use crate::adapter::git;
@@ -46,7 +48,7 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
     .flatten()
     .collect::<Vec<_>>();
 
-    let (status, reason) = report_status_and_reason(
+    let summary = report_summary(
         scan.value.as_ref(),
         gate.value.as_ref(),
         draft.value.as_ref(),
@@ -55,8 +57,17 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
     );
 
     let markdown = build_report_markdown(
-        status,
-        reason.as_deref(),
+        ReportHeader {
+            run_status: summary.status,
+            data_coverage: summary.data_coverage,
+            review_signal: summary.review_signal,
+            residual_blockers: gate
+                .value
+                .as_ref()
+                .map(|artifact| artifact.residual_blockers.len())
+                .unwrap_or(0),
+        },
+        summary.reason.as_deref(),
         scan.value.as_ref(),
         gate.value.as_ref(),
         draft.value.as_ref(),
@@ -67,8 +78,15 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
     let action_count = count_author_actions(&markdown);
 
     Ok(CommandOutcome {
-        status,
-        reason,
+        status: summary.status,
+        data_coverage: summary.data_coverage,
+        review_signal: summary.review_signal,
+        residual_blockers: gate
+            .value
+            .as_ref()
+            .map(|artifact| artifact.residual_blockers.len())
+            .unwrap_or(0),
+        reason: summary.reason,
         lines: vec![
             format!(
                 "Residual blockers: {}",
@@ -80,7 +98,13 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
             String::from("PM summary ready: yes"),
             format!("Author actions: {action_count}"),
         ],
-        next: None,
+        next: if summary.review_signal == ReviewSignal::Unknown {
+            Some(String::from(
+                "Resolve missing blocker analysis inputs before making a merge decision.",
+            ))
+        } else {
+            None
+        },
     })
 }
 
@@ -93,6 +117,13 @@ struct ArtifactProblem {
 struct ArtifactRead<T> {
     value: Option<T>,
     problem: Option<ArtifactProblem>,
+}
+
+struct ReportSummary {
+    status: Status,
+    data_coverage: DataCoverage,
+    review_signal: ReviewSignal,
+    reason: Option<String>,
 }
 
 fn read_json_artifact<T: DeserializeOwned>(
@@ -171,13 +202,13 @@ pub fn count_author_actions_for_tests(markdown: &str) -> usize {
     count_author_actions(markdown)
 }
 
-fn report_status_and_reason(
+fn report_summary(
     scan: Option<&ScanArtifact>,
     gate: Option<&GateArtifact>,
     draft: Option<&DraftReplyArtifact>,
     escalation: Option<&str>,
     input_problems: &[ArtifactProblem],
-) -> (Status, Option<String>) {
+) -> ReportSummary {
     let escalation_status = escalation
         .and_then(markdown_status)
         .unwrap_or(Status::Partial);
@@ -204,6 +235,19 @@ fn report_status_and_reason(
         status = status.merge(problem.status);
     }
 
+    let data_coverage = if let Some(gate) = gate {
+        gate.data_coverage
+    } else if gate_missing_or_unreadable(input_problems) {
+        DataCoverage::Failed
+    } else {
+        scan.map(|artifact| artifact.data_coverage)
+            .unwrap_or(DataCoverage::Failed)
+    };
+
+    let review_signal = gate
+        .map(|artifact| artifact.review_signal)
+        .unwrap_or(ReviewSignal::Unknown);
+
     let reason = gate
         .and_then(|artifact| artifact.reason.clone())
         .or_else(|| draft.and_then(|artifact| artifact.reason.clone()))
@@ -211,7 +255,12 @@ fn report_status_and_reason(
         .or_else(|| scan.and_then(|artifact| artifact.reason.clone()))
         .or_else(|| input_problems.first().map(|problem| problem.reason.clone()));
 
-    (status, reason)
+    ReportSummary {
+        status,
+        data_coverage,
+        review_signal,
+        reason,
+    }
 }
 
 #[cfg(test)]
@@ -221,12 +270,21 @@ pub fn report_status_and_reason_for_tests(
     gate: Option<&GateArtifact>,
     draft: Option<&DraftReplyArtifact>,
     escalation: Option<&str>,
-) -> (Status, Option<String>) {
-    report_status_and_reason(scan, gate, draft, escalation, &[])
+) -> (Status, DataCoverage, ReviewSignal, Option<String>) {
+    let summary = report_summary(scan, gate, draft, escalation, &[]);
+    (
+        summary.status,
+        summary.data_coverage,
+        summary.review_signal,
+        summary.reason,
+    )
 }
 
 fn markdown_status(markdown: &str) -> Option<Status> {
     markdown.lines().find_map(|line| match line.trim() {
+        "RUN_STATUS: OK" => Some(Status::Ok),
+        "RUN_STATUS: PARTIAL" => Some(Status::Partial),
+        "RUN_STATUS: ERROR" => Some(Status::Error),
         "STATUS: OK" => Some(Status::Ok),
         "STATUS: PARTIAL" => Some(Status::Partial),
         "STATUS: ERROR" => Some(Status::Error),
@@ -240,6 +298,13 @@ fn markdown_reason(markdown: &str) -> Option<String> {
         .find_map(|line| line.trim().strip_prefix("REASON: "))
         .filter(|reason| !reason.is_empty())
         .map(ToOwned::to_owned)
+}
+
+fn gate_missing_or_unreadable(problems: &[ArtifactProblem]) -> bool {
+    problems.iter().any(|problem| {
+        problem.reason.contains("gate.json not found")
+            || problem.reason.contains("gate.json could not be read")
+    })
 }
 
 fn io_error(error: std::io::Error) -> String {

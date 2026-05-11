@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use rf_core::domain::{
-    CommentRecord, CommentSource, ProductBoundarySnapshot, PullRequestSummary, ScanArtifact, Status,
+    CommentRecord, CommentSource, DataCoverage, ProductBoundarySnapshot, PullRequestSummary,
+    ReviewSignal, ScanArtifact, Status,
 };
 use rf_core::{build_conversation_threads_for_author, normalize_path};
 use serde_json::Value;
@@ -275,9 +276,12 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
         .into_iter()
         .map(|path| normalize_path(&path))
         .collect::<Vec<_>>();
+    let data_coverage = DataCoverage::from_partial_sources(!partial_sources.is_empty());
 
     let artifact = ScanArtifact {
         status,
+        data_coverage,
+        review_signal: ReviewSignal::Unknown,
         reason: reason.clone(),
         scan_partial: status != Status::Ok,
         repo_root: Some(repo_root.path.to_string_lossy().into_owned()),
@@ -302,6 +306,9 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
 
     Ok(CommandOutcome {
         status: artifact.status,
+        data_coverage: artifact.data_coverage,
+        review_signal: artifact.review_signal,
+        residual_blockers: 0,
         reason,
         lines: vec![
             format!(
@@ -318,9 +325,15 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
             format!("Codeowners found: {}", yes_no(artifact.codeowners_found)),
             format!("Policy file found: {}", yes_no(artifact.policy_found)),
         ],
-        next: artifact
-            .scan_partial
-            .then(|| String::from("scan_partial=true")),
+        next: if artifact.data_coverage != DataCoverage::Full {
+            Some(String::from(
+                "Inspect missing review inputs, then rerun review-firewall scan.",
+            ))
+        } else {
+            artifact
+                .scan_partial
+                .then(|| String::from("scan completed with partial local metadata"))
+        },
     })
 }
 

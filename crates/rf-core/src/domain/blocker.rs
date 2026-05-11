@@ -3,6 +3,26 @@ use serde::{Deserialize, Serialize};
 use crate::domain::comment::BlockerConcern;
 use crate::domain::ownership::{AdvisoryWeight, OwnershipScope};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceClass {
+    CausalRuntimeFailure,
+    ContractDelta,
+    ReproCondition,
+    SecurityCondition,
+    CiTestFailure,
+    ConcreteReference,
+    KeywordOnly,
+    PathOnly,
+    NoiseOnly,
+}
+
+impl EvidenceClass {
+    pub const fn supports_residual_blocker(self) -> bool {
+        !matches!(self, Self::KeywordOnly | Self::PathOnly | Self::NoiseOnly)
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GateCounts {
     pub questions: usize,
@@ -18,6 +38,7 @@ pub struct ResidualBlocker {
     pub comment_id: String,
     pub concern: BlockerConcern,
     pub failure_mode: String,
+    pub evidence_class: EvidenceClass,
     pub evidence: Vec<String>,
     pub owner_match: bool,
     pub ownership_scope: OwnershipScope,

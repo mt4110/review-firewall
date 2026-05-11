@@ -4,7 +4,7 @@ use crate::domain::blocker::{DuplicateGroup, GateCounts, ResidualBlocker};
 use crate::domain::comment::{ClassifiedComment, CommentRecord, ReviewThread};
 use crate::domain::escalation::EscalationCandidate;
 use crate::domain::reply::ReplyType;
-use crate::domain::status::Status;
+use crate::domain::status::{DataCoverage, ReviewSignal, Status};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LatestPointer {
@@ -57,6 +57,10 @@ impl Default for ProductBoundarySnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScanArtifact {
     pub status: Status,
+    #[serde(default)]
+    pub data_coverage: DataCoverage,
+    #[serde(default)]
+    pub review_signal: ReviewSignal,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
     pub scan_partial: bool,
@@ -112,6 +116,10 @@ impl Default for GateConfigSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GateArtifact {
     pub status: Status,
+    #[serde(default)]
+    pub data_coverage: DataCoverage,
+    #[serde(default)]
+    pub review_signal: ReviewSignal,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
     pub comments_analyzed: usize,
@@ -135,6 +143,10 @@ pub struct GateArtifact {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DraftReplyArtifact {
     pub status: Status,
+    #[serde(default)]
+    pub data_coverage: DataCoverage,
+    #[serde(default)]
+    pub review_signal: ReviewSignal,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
     pub reply_type: ReplyType,

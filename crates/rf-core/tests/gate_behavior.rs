@@ -1,6 +1,6 @@
 use rf_core::domain::{
-    BlockerConcern, CommentRecord, CommentSource, GateConfigSnapshot, PullRequestSummary,
-    ScanArtifact, Status,
+    BlockerConcern, CommentRecord, CommentSource, DataCoverage, EvidenceClass, GateConfigSnapshot,
+    PullRequestSummary, ReviewSignal, ScanArtifact, Status,
 };
 use rf_core::{build_review_threads, gate_scan};
 
@@ -20,6 +20,8 @@ fn base_scan(comment_body: &str) -> ScanArtifact {
 
     ScanArtifact {
         status: Status::Ok,
+        data_coverage: DataCoverage::Full,
+        review_signal: ReviewSignal::Unknown,
         reason: None,
         scan_partial: false,
         repo_root: Some(String::from("/tmp/review-firewall")),
@@ -110,7 +112,7 @@ fn failure_mode_and_evidence_detection_is_case_insensitive() {
 }
 
 #[test]
-fn scoped_changed_path_without_failure_mode_is_not_present_pr_impact() {
+fn scoped_concern_can_become_present_pr_impact_when_requirements_are_disabled() {
     let scan = base_scan("This security concern is here in this PR.");
     let config = GateConfigSnapshot {
         require_failure_mode: false,
@@ -124,8 +126,10 @@ fn scoped_changed_path_without_failure_mode_is_not_present_pr_impact() {
         .classified_comments
         .first()
         .expect("classified comment");
-    assert!(!comment.present_pr_impact);
-    assert!(gate.residual_blockers.is_empty());
+    let blocker = gate.residual_blockers.first().expect("residual blocker");
+    assert!(comment.present_pr_impact);
+    assert_eq!(blocker.concern, BlockerConcern::Security);
+    assert_eq!(blocker.evidence_class, EvidenceClass::KeywordOnly);
 }
 
 #[test]
@@ -156,8 +160,41 @@ fn config_can_disable_evidence_requirement() {
 
     let gate = gate_scan(&scan, &config, &[]);
 
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
     let blocker = gate.residual_blockers.first().expect("residual blocker");
     assert_eq!(blocker.concern, BlockerConcern::Correctness);
+    assert_eq!(blocker.evidence_class, EvidenceClass::KeywordOnly);
+    assert!(comment.evidence.is_empty());
+    assert_eq!(
+        blocker.evidence,
+        vec![String::from("evidence was not extracted")]
+    );
+}
+
+#[test]
+fn failure_mode_text_is_not_reused_as_evidence() {
+    let scan = base_scan("This can break consumers in this PR.");
+    let config = GateConfigSnapshot {
+        require_evidence: false,
+        ..GateConfigSnapshot::default()
+    };
+
+    let gate = gate_scan(&scan, &config, &[]);
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    let blocker = gate.residual_blockers.first().expect("residual blocker");
+
+    assert_eq!(
+        comment.failure_mode.as_deref(),
+        Some("This can break consumers in this PR")
+    );
+    assert!(comment.evidence.is_empty());
+    assert_eq!(blocker.evidence_class, EvidenceClass::KeywordOnly);
 }
 
 #[test]
@@ -314,4 +351,56 @@ fn duplicate_detection_preserves_identical_text_in_separate_threads() {
     assert_eq!(gate.residual_blockers.len(), 2);
     assert_eq!(gate.candidate_blockers.len(), 2);
     assert!(gate.duplicates_collapsed.is_empty());
+}
+
+#[test]
+fn badge_markup_does_not_leak_into_failure_mode() {
+    let scan = base_scan(
+        "<sub><img src=\"https://img.shields.io/badge/coverage-100%25-brightgreen?style=flat\" /></sub>\nmode: response contract changes when status=partial.\nbecause clients still parse the old shape.\nin this pr: this PR changes the response shape.",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+    let blocker = gate.residual_blockers.first().expect("residual blocker");
+
+    assert!(!blocker.failure_mode.contains("style=flat"));
+    assert!(!blocker.evidence.join(" ").contains("style=flat"));
+}
+
+#[test]
+fn badge_only_comment_becomes_noise_only() {
+    let scan = base_scan(
+        "<sub><img src=\"https://img.shields.io/badge/test-passing?style=flat\" /></sub>",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+
+    assert_eq!(comment.comment_type, rf_core::domain::CommentType::Unknown);
+    assert_eq!(comment.evidence_class, Some(EvidenceClass::NoiseOnly));
+    assert!(gate.residual_blockers.is_empty());
+}
+
+#[test]
+fn normalize_preserves_generic_like_code_text() {
+    let normalized = rf_core::normalize::normalize_body(
+        "Returning Option<Result<T>> here can break callers in this PR.",
+    );
+
+    assert!(normalized.contains("option<result<t"));
+}
+
+#[test]
+fn partial_scan_keeps_review_signal_unknown() {
+    let mut scan = base_scan(
+        "This can break the response contract in this PR because `partial` changes client handling.",
+    );
+    scan.status = Status::Partial;
+    scan.data_coverage = DataCoverage::Partial;
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    assert_eq!(gate.review_signal, ReviewSignal::Unknown);
 }

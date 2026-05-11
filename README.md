@@ -7,7 +7,7 @@
 It does **not** replace code review.
 It does **not** replace CI.
 It does **not** decide architecture for your team.
-It does **not** generate AI reviews.
+It does **not** generate new review comments.
 
 It does one thing:
 
@@ -31,7 +31,7 @@ The author pays first.
 
 `review-firewall` sits after review comments already exist.
 
-It can consume comments from humans, AI review bots, CI summaries, or local review tools, but it does not create those reviews itself. Its job is to decide what is actually actionable for the author: which comments are evidence-backed blockers, which should become questions or suggestions, and which design debates should leave the PR.
+It can consume comments from humans, automated review tools, CI summaries, or local review workflows, but it does not create those reviews itself. Its job is to decide what is actually actionable for the author: which comments are evidence-backed blockers, which should become questions or suggestions, and which design debates should leave the PR.
 
 See [Product Boundary](docs/PRODUCT_BOUNDARY.md) for the non-overlap contract.
 
@@ -66,7 +66,7 @@ Out of scope for v0.1:
 - policy packs
 - auto-merge
 - LLM-dependent core logic
-- AI review generation
+- new review generation
 - review history learning or scoring
 
 ## Core principles

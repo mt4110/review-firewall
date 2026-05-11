@@ -1,8 +1,8 @@
 use crate::dedupe::collapse_duplicates_with_primary_filter;
 use crate::domain::CodeownerRule;
 use crate::domain::{
-    BlockerConcern, ClassifiedComment, CommentRecord, CommentType, GateArtifact,
-    GateConfigSnapshot, GateCounts, ResidualBlocker, ScanArtifact, Status,
+    BlockerConcern, ClassifiedComment, CommentRecord, CommentType, EvidenceClass, GateArtifact,
+    GateConfigSnapshot, GateCounts, ResidualBlocker, ScanArtifact, Status, review_signal_for,
 };
 use crate::escalation::evaluate_escalation_candidates;
 use crate::normalize::{normalize_body, split_sentences};
@@ -34,14 +34,18 @@ pub fn gate_scan(
         .map(to_residual_blocker)
         .collect::<Vec<_>>();
 
-    let residual_blockers = collect_residual_blockers(&classified);
+    let residual_blockers = collect_residual_blockers(&classified, config);
     let downgraded_comments = classified
         .iter()
         .filter(|comment| {
+            let missing_required_evidence = config.require_evidence
+                && !comment
+                    .evidence_class
+                    .is_some_and(EvidenceClass::supports_residual_blocker);
             comment.comment_type != CommentType::Blocker
                 && comment.concern.is_some()
                 && (comment.failure_mode.is_none()
-                    || comment.evidence.is_empty()
+                    || missing_required_evidence
                     || !comment.present_pr_impact)
         })
         .map(|comment| comment.comment.comment_id.clone())
@@ -67,9 +71,12 @@ pub fn gate_scan(
     } else {
         scan.status
     };
+    let review_signal = review_signal_for(scan.data_coverage, residual_blockers.len());
 
     GateArtifact {
         status,
+        data_coverage: scan.data_coverage,
+        review_signal,
         reason: scan.reason.clone(),
         comments_analyzed: classified.len(),
         residual_blockers,
@@ -100,13 +107,16 @@ fn classify_comment(
 ) -> ClassifiedComment {
     let concern = extract_concern(&comment.body);
     let failure_mode = extract_failure_mode(&comment.body);
-    let evidence = extract_evidence(comment, scan);
+    let evidence = extract_evidence(comment, failure_mode.as_deref());
+    let evidence_class = extract_evidence_class(comment, &evidence);
+    let evidence_supported = evidence_class.is_some_and(EvidenceClass::supports_residual_blocker);
     let present_pr_impact = extract_present_pr_impact(
         comment,
         failure_mode.as_deref(),
         config.require_failure_mode,
+        config.require_evidence,
         concern,
-        !evidence.is_empty(),
+        evidence_supported,
     );
     let preference_only = is_preference_only(&comment.body, concern);
     let author_comment = is_pr_author_comment(comment, scan);
@@ -118,10 +128,11 @@ fn classify_comment(
         config.use_codeowners,
     );
 
+    let evidence_satisfies_gate = !config.require_evidence || evidence_supported;
     let candidate_blocker = !author_comment
         && (!config.require_concern || concern.is_some())
         && (!config.require_failure_mode || failure_mode.is_some())
-        && (!config.require_evidence || !evidence.is_empty())
+        && evidence_satisfies_gate
         && !preference_only;
 
     let alternative_present = contains_any(
@@ -141,6 +152,8 @@ fn classify_comment(
 
     let comment_type = if full_blocker {
         CommentType::Blocker
+    } else if matches!(evidence_class, Some(EvidenceClass::NoiseOnly)) {
+        CommentType::Unknown
     } else if is_praise(&comment.body) {
         CommentType::Praise
     } else if preference_only || is_nit(&comment.body) {
@@ -160,6 +173,7 @@ fn classify_comment(
         comment_type,
         concern,
         failure_mode,
+        evidence_class,
         evidence,
         present_pr_impact,
         owner_match: ownership.owner_match,
@@ -169,12 +183,20 @@ fn classify_comment(
     }
 }
 
-fn collect_residual_blockers(classified: &[ClassifiedComment]) -> Vec<ResidualBlocker> {
+fn collect_residual_blockers(
+    classified: &[ClassifiedComment],
+    config: &GateConfigSnapshot,
+) -> Vec<ResidualBlocker> {
     let mut seen_threads = Vec::<String>::new();
     let mut residual = Vec::new();
 
     for comment in classified.iter().filter(|comment| {
-        comment.comment_type == CommentType::Blocker && comment.duplicate_of_comment_id.is_none()
+        comment.comment_type == CommentType::Blocker
+            && comment.duplicate_of_comment_id.is_none()
+            && (!config.require_evidence
+                || comment
+                    .evidence_class
+                    .is_some_and(EvidenceClass::supports_residual_blocker))
     }) {
         if seen_threads
             .iter()
@@ -197,6 +219,9 @@ fn to_residual_blocker(comment: &ClassifiedComment) -> ResidualBlocker {
             .failure_mode
             .clone()
             .unwrap_or_else(|| String::from("failure mode was not extracted")),
+        evidence_class: comment
+            .evidence_class
+            .unwrap_or(EvidenceClass::ConcreteReference),
         evidence: if comment.evidence.is_empty() {
             vec![String::from("evidence was not extracted")]
         } else {
@@ -211,9 +236,13 @@ fn to_residual_blocker(comment: &ClassifiedComment) -> ResidualBlocker {
 }
 
 fn is_candidate_blocker(comment: &ClassifiedComment, config: &GateConfigSnapshot) -> bool {
+    let evidence_supported = comment
+        .evidence_class
+        .is_some_and(EvidenceClass::supports_residual_blocker);
+
     (!config.require_concern || comment.concern.is_some())
         && (!config.require_failure_mode || comment.failure_mode.is_some())
-        && (!config.require_evidence || !comment.evidence.is_empty())
+        && (!config.require_evidence || evidence_supported)
 }
 
 fn extract_concern(body: &str) -> Option<BlockerConcern> {
@@ -588,53 +617,142 @@ fn extract_failure_mode(body: &str) -> Option<String> {
     })
 }
 
-fn extract_evidence(comment: &CommentRecord, scan: &ScanArtifact) -> Vec<String> {
+fn extract_evidence(comment: &CommentRecord, failure_mode: Option<&str>) -> Vec<String> {
     let mut evidence = Vec::<String>::new();
+    let normalized_failure_mode = failure_mode.map(normalize_body);
 
     for snippet in backtick_fragments(&comment.body) {
-        evidence.push(format!("comment references `{snippet}`"));
+        if !looks_like_noise_fragment(&snippet) {
+            evidence.push(format!("comment references `{snippet}`"));
+        }
     }
 
     for sentence in split_sentences(&comment.body) {
         let normalized = normalize_body(&sentence);
-        if contains_any(
-            &normalized,
-            &[
-                "because",
-                "for example",
-                "for instance",
-                "if ",
-                "when ",
-                "returns",
-                "status=",
-                "response",
-                "contract",
-                "schema",
-                "because ",
-                "理由:",
-                "根拠",
-                "証拠",
-            ],
-        ) {
+        if normalized_failure_mode.as_deref() == Some(normalized.as_str())
+            && !sentence_supports_independent_evidence(&normalized)
+        {
+            continue;
+        }
+        if sentence_supports_evidence(&normalized) {
             evidence.push(sentence);
-            break;
         }
     }
 
-    if !evidence.is_empty()
-        && let Some(path) = comment.path.as_ref()
-        && scan.changed_files.iter().any(|changed| changed == path)
-    {
-        evidence.push(format!("changed path {path}"));
+    dedupe_strings(evidence)
+}
+
+fn extract_evidence_class(comment: &CommentRecord, evidence: &[String]) -> Option<EvidenceClass> {
+    let normalized_body = normalize_body(&comment.body);
+    if normalized_body.is_empty() {
+        return Some(EvidenceClass::NoiseOnly);
     }
 
-    dedupe_strings(evidence)
+    if let Some(path) = comment.path.as_ref()
+        && (normalize_body(path) == normalized_body
+            || looks_like_path_only_text(comment.body.as_str(), path))
+    {
+        return Some(EvidenceClass::PathOnly);
+    }
+
+    if evidence.is_empty() {
+        return Some(EvidenceClass::KeywordOnly);
+    }
+
+    let normalized_evidence = normalize_body(&evidence.join(" "));
+
+    if contains_any(
+        &normalized_evidence,
+        &[
+            "ci",
+            "check failed",
+            "test fails",
+            "test failure",
+            "failing test",
+            "red build",
+            "workflow failed",
+        ],
+    ) {
+        return Some(EvidenceClass::CiTestFailure);
+    }
+
+    if contains_any(
+        &normalized_evidence,
+        &[
+            "auth",
+            "authorization",
+            "permission",
+            "token",
+            "secret",
+            "xss",
+            "csrf",
+            "ssrf",
+            "sql injection",
+            "path traversal",
+            "open redirect",
+            "vuln",
+            "認可",
+            "権限",
+            "漏えい",
+        ],
+    ) {
+        return Some(EvidenceClass::SecurityCondition);
+    }
+
+    if contains_any(
+        &normalized_evidence,
+        &[
+            "contract",
+            "schema",
+            "response shape",
+            "request shape",
+            "consumer",
+            "wire format",
+            "status code",
+            "後方互換",
+            "互換",
+            "契約",
+        ],
+    ) {
+        return Some(EvidenceClass::ContractDelta);
+    }
+
+    if contains_any(
+        &normalized_evidence,
+        &[
+            "if ",
+            "when ",
+            "returns",
+            "status=",
+            "repro",
+            "steps",
+            "under ",
+            "only when",
+            "race",
+        ],
+    ) {
+        return Some(EvidenceClass::ReproCondition);
+    }
+
+    if evidence
+        .iter()
+        .any(|item| item.starts_with("comment references `"))
+    {
+        return Some(EvidenceClass::ConcreteReference);
+    }
+
+    if contains_any(&normalized_evidence, &["because", "理由:", "根拠"]) {
+        return Some(EvidenceClass::CausalRuntimeFailure);
+    }
+
+    Some(EvidenceClass::ConcreteReference)
 }
 
 fn extract_present_pr_impact(
     comment: &CommentRecord,
     failure_mode: Option<&str>,
     require_failure_mode: bool,
+    require_evidence: bool,
     concern: Option<BlockerConcern>,
     evidence_present: bool,
 ) -> bool {
@@ -659,7 +777,8 @@ fn extract_present_pr_impact(
     if !scope_marker {
         return false;
     }
-    failure_mode.is_some() || (!require_failure_mode && concern.is_some() && evidence_present)
+    failure_mode.is_some()
+        || (!require_failure_mode && concern.is_some() && (!require_evidence || evidence_present))
 }
 
 fn contains_scope_marker(text: &str, markers: &[&str]) -> bool {
@@ -822,6 +941,70 @@ fn is_suggestion(body: &str) -> bool {
     )
 }
 
+fn sentence_supports_evidence(text: &str) -> bool {
+    contains_any(
+        text,
+        &[
+            "because",
+            "for example",
+            "for instance",
+            "if ",
+            "when ",
+            "returns",
+            "status=",
+            "response",
+            "contract",
+            "schema",
+            "理由:",
+            "根拠",
+            "証拠",
+            "test fails",
+            "check failed",
+            "ci",
+        ],
+    )
+}
+
+fn sentence_supports_independent_evidence(text: &str) -> bool {
+    contains_any(
+        text,
+        &[
+            "because",
+            "for example",
+            "for instance",
+            "if ",
+            "when ",
+            "returns",
+            "status=",
+            "理由:",
+            "根拠",
+            "証拠",
+            "test fails",
+            "check failed",
+            "ci",
+            "auth",
+            "authorization",
+            "permission",
+            "token",
+            "secret",
+            "xss",
+            "csrf",
+            "ssrf",
+            "sql injection",
+            "path traversal",
+            "open redirect",
+            "response shape",
+            "request shape",
+            "consumer",
+            "wire format",
+            "status code",
+            "後方互換",
+            "互換",
+            "契約",
+        ],
+    )
+}
+
 fn contains_any(text: &str, needles: &[&str]) -> bool {
     needles.iter().any(|needle| text.contains(needle))
 }
@@ -861,6 +1044,23 @@ fn backtick_fragments(body: &str) -> Vec<String> {
     fragments
 }
 
+fn looks_like_noise_fragment(fragment: &str) -> bool {
+    let normalized = normalize_body(fragment);
+    normalized.is_empty()
+        || normalized.contains("style=flat")
+        || normalized.contains("shields.io")
+        || normalized.contains("img.shields.io")
+        || normalized.contains("badge")
+}
+
+fn looks_like_path_only_text(body: &str, path: &str) -> bool {
+    let normalized_body = normalize_body(body);
+    let normalized_path = normalize_body(path);
+
+    normalized_body == normalized_path
+        || normalized_body == normalize_body(&format!("changed path {path}"))
+}
+
 fn dedupe_strings(values: Vec<String>) -> Vec<String> {
     let mut unique = Vec::new();
     for value in values {
@@ -884,6 +1084,8 @@ mod tests {
     fn rejects_preference_only_comment() {
         let scan = ScanArtifact {
             status: Status::Ok,
+            data_coverage: crate::domain::DataCoverage::Full,
+            review_signal: crate::domain::ReviewSignal::Unknown,
             reason: None,
             scan_partial: false,
             repo_root: Some(String::from("/tmp/review-firewall")),
@@ -928,6 +1130,8 @@ mod tests {
     fn runtime_security_terms_survive_metalinguistic_context() {
         let scan = ScanArtifact {
             status: Status::Ok,
+            data_coverage: crate::domain::DataCoverage::Full,
+            review_signal: crate::domain::ReviewSignal::Unknown,
             reason: None,
             scan_partial: false,
             repo_root: Some(String::from("/tmp/review-firewall")),
@@ -1008,6 +1212,8 @@ mod tests {
     fn scan_with_comment_body(body: &str) -> ScanArtifact {
         ScanArtifact {
             status: Status::Ok,
+            data_coverage: crate::domain::DataCoverage::Full,
+            review_signal: crate::domain::ReviewSignal::Unknown,
             reason: None,
             scan_partial: false,
             repo_root: Some(String::from("/tmp/review-firewall")),

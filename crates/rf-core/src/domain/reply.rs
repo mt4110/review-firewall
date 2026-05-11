@@ -4,6 +4,10 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum ReplyType {
     Accept,
-    Decline,
-    Move,
+    AskForEvidence,
+    AskForScope,
+    MoveToAdr,
+    MoveToRfc,
+    NeedsHumanJudgment,
+    CannotClassify,
 }

@@ -1,14 +1,30 @@
-use crate::domain::{DraftReplyArtifact, GateArtifact, ScanArtifact, Status};
+use crate::domain::{
+    DataCoverage, DraftReplyArtifact, GateArtifact, ReviewSignal, ScanArtifact, Status,
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ReportHeader {
+    pub run_status: Status,
+    pub data_coverage: DataCoverage,
+    pub review_signal: ReviewSignal,
+    pub residual_blockers: usize,
+}
 
 pub fn build_report_markdown(
-    status: Status,
+    header: ReportHeader,
     reason: Option<&str>,
     scan: Option<&ScanArtifact>,
     gate: Option<&GateArtifact>,
     draft_reply: Option<&DraftReplyArtifact>,
     escalation_markdown: Option<&str>,
 ) -> String {
-    let mut lines = vec![format!("STATUS: {}", status.terminal_label())];
+    let mut lines = vec![
+        format!("RUN_STATUS: {}", header.run_status.terminal_label()),
+        format!("DATA_COVERAGE: {}", header.data_coverage.terminal_label()),
+        format!("REVIEW_SIGNAL: {}", header.review_signal.terminal_label()),
+        format!("RESIDUAL_BLOCKERS: {}", header.residual_blockers),
+        format!("STATUS: {}", header.run_status.terminal_label()),
+    ];
     if let Some(reason) = reason
         && !reason.is_empty()
     {
@@ -23,13 +39,14 @@ pub fn build_report_markdown(
         Some(gate) if !gate.residual_blockers.is_empty() => {
             for blocker in &gate.residual_blockers {
                 lines.push(format!(
-                    "- {}: {}",
+                    "- {} [{}]: {}",
                     concern_label(&blocker.concern),
+                    evidence_class_label(&blocker.evidence_class),
                     blocker.failure_mode
                 ));
             }
         }
-        _ if status != Status::Ok => {
+        _ if header.review_signal == ReviewSignal::Unknown => {
             lines.push(String::from("- unknown: blocker analysis did not complete"))
         }
         _ => lines.push(String::from("- none")),
@@ -37,10 +54,7 @@ pub fn build_report_markdown(
 
     lines.push(String::new());
     lines.push(String::from("## PM summary"));
-    let residual_count = gate
-        .map(|artifact| artifact.residual_blockers.len())
-        .unwrap_or(0);
-    lines.push(format!("Residual blockers: {residual_count}"));
+    lines.push(format!("Residual blockers: {}", header.residual_blockers));
     if let Some(first_blocker) = gate.and_then(|artifact| artifact.residual_blockers.first()) {
         lines.push(format!("Impact: {}", first_blocker.failure_mode));
         lines.push(String::from(
@@ -50,7 +64,7 @@ pub fn build_report_markdown(
         let escalation_count = escalation_markdown
             .map(count_escalation_candidates)
             .unwrap_or(0);
-        if status != Status::Ok {
+        if header.review_signal == ReviewSignal::Unknown {
             lines.push(String::from(
                 "Impact: blocker analysis did not complete; no merge-safety claim is available",
             ));
@@ -137,7 +151,25 @@ fn count_escalation_candidates(markdown: &str) -> usize {
 fn reply_label(reply_type: &crate::domain::ReplyType) -> &'static str {
     match reply_type {
         crate::domain::ReplyType::Accept => "accept",
-        crate::domain::ReplyType::Decline => "decline",
-        crate::domain::ReplyType::Move => "move",
+        crate::domain::ReplyType::AskForEvidence => "ask_for_evidence",
+        crate::domain::ReplyType::AskForScope => "ask_for_scope",
+        crate::domain::ReplyType::MoveToAdr => "move_to_adr",
+        crate::domain::ReplyType::MoveToRfc => "move_to_rfc",
+        crate::domain::ReplyType::NeedsHumanJudgment => "needs_human_judgment",
+        crate::domain::ReplyType::CannotClassify => "cannot_classify",
+    }
+}
+
+fn evidence_class_label(class: &crate::domain::EvidenceClass) -> &'static str {
+    match class {
+        crate::domain::EvidenceClass::CausalRuntimeFailure => "causal_runtime_failure",
+        crate::domain::EvidenceClass::ContractDelta => "contract_delta",
+        crate::domain::EvidenceClass::ReproCondition => "repro_condition",
+        crate::domain::EvidenceClass::SecurityCondition => "security_condition",
+        crate::domain::EvidenceClass::CiTestFailure => "ci_test_failure",
+        crate::domain::EvidenceClass::ConcreteReference => "concrete_reference",
+        crate::domain::EvidenceClass::KeywordOnly => "keyword_only",
+        crate::domain::EvidenceClass::PathOnly => "path_only",
+        crate::domain::EvidenceClass::NoiseOnly => "noise_only",
     }
 }

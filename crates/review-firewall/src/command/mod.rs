@@ -1,4 +1,4 @@
-use rf_core::domain::Status;
+use rf_core::domain::{DataCoverage, ReviewSignal, Status};
 
 pub mod draft_reply;
 pub mod escalate;
@@ -17,6 +17,9 @@ pub enum CommandKind {
 
 pub struct CommandOutcome {
     pub status: Status,
+    pub data_coverage: DataCoverage,
+    pub review_signal: ReviewSignal,
+    pub residual_blockers: usize,
     pub reason: Option<String>,
     pub lines: Vec<String>,
     pub next: Option<String>,

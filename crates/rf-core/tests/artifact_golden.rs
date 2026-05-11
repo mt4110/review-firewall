@@ -1,12 +1,15 @@
 use rf_core::domain::{
-    AdvisoryWeight, BlockerConcern, DraftReplyArtifact, GateArtifact, GateConfigSnapshot,
-    GateCounts, PullRequestSummary, ReplyType, ResidualBlocker, ScanArtifact, Status,
+    AdvisoryWeight, BlockerConcern, DataCoverage, DraftReplyArtifact, EvidenceClass, GateArtifact,
+    GateConfigSnapshot, GateCounts, PullRequestSummary, ReplyType, ResidualBlocker, ReviewSignal,
+    ScanArtifact, Status,
 };
 
 #[test]
 fn scan_artifact_serializes_minimum_shape() {
     let scan = ScanArtifact {
         status: Status::Ok,
+        data_coverage: DataCoverage::Full,
+        review_signal: ReviewSignal::Unknown,
         reason: None,
         scan_partial: false,
         repo_root: Some(String::from("/tmp/review-firewall")),
@@ -32,6 +35,8 @@ fn scan_artifact_serializes_minimum_shape() {
 
     let rendered = serde_json::to_string_pretty(&scan).expect("scan json");
     assert!(rendered.contains(r#""status": "OK""#));
+    assert!(rendered.contains(r#""data_coverage": "FULL""#));
+    assert!(rendered.contains(r#""review_signal": "UNKNOWN""#));
     assert!(rendered.contains(r#""files_changed": 8"#));
     assert!(rendered.contains(r#""review_comments": 17"#));
     assert!(rendered.contains(r#""threads": 6"#));
@@ -46,12 +51,15 @@ fn scan_artifact_serializes_minimum_shape() {
 fn gate_artifact_serializes_minimum_shape() {
     let gate = GateArtifact {
         status: Status::Ok,
+        data_coverage: DataCoverage::Full,
+        review_signal: ReviewSignal::Blocked,
         reason: None,
         comments_analyzed: 17,
         residual_blockers: vec![ResidualBlocker {
             comment_id: String::from("12"),
             concern: BlockerConcern::Correctness,
             failure_mode: String::from("partial status may break response contract"),
+            evidence_class: EvidenceClass::ContractDelta,
             evidence: vec![String::from(
                 "response contract changes when status=partial",
             )],
@@ -78,6 +86,9 @@ fn gate_artifact_serializes_minimum_shape() {
     };
 
     let rendered = serde_json::to_string_pretty(&gate).expect("gate json");
+    assert!(rendered.contains(r#""data_coverage": "FULL""#));
+    assert!(rendered.contains(r#""review_signal": "BLOCKED""#));
+    assert!(rendered.contains(r#""evidence_class": "contract_delta""#));
     assert!(rendered.contains(r#""comments_analyzed": 17"#));
     assert!(rendered.contains(r#""residual_blockers""#));
     assert!(rendered.contains(r#""questions": 4"#));
@@ -87,6 +98,8 @@ fn gate_artifact_serializes_minimum_shape() {
 fn draft_reply_roundtrip_is_stable() {
     let draft = DraftReplyArtifact {
         status: Status::Ok,
+        data_coverage: DataCoverage::Full,
+        review_signal: ReviewSignal::Blocked,
         reason: None,
         reply_type: ReplyType::Accept,
         target_comment_id: Some(String::from("12")),
@@ -97,6 +110,7 @@ fn draft_reply_roundtrip_is_stable() {
 
     let rendered = serde_json::to_string_pretty(&draft).expect("draft json");
     assert!(rendered.contains(r#""reply_type": "accept""#));
+    assert!(rendered.contains(r#""review_signal": "BLOCKED""#));
     let restored: DraftReplyArtifact =
         serde_json::from_str(&rendered).expect("draft reply roundtrip");
     assert_eq!(restored.body, draft.body);

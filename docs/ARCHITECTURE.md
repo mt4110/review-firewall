@@ -145,6 +145,26 @@ Forbidden:
 - `PARTIAL`
 - `ERROR`
 
+`status` is the run/artifact generation status.
+
+### Data coverage
+
+- `FULL`
+- `PARTIAL`
+- `FAILED`
+
+`data_coverage` tracks whether review inputs were fully observed.
+It must not be downgraded just because config parsing or CODEOWNERS advisory loading was partial.
+
+### Review signal
+
+- `BLOCKED`
+- `CLEAR`
+- `UNKNOWN`
+
+`review_signal` is the author-facing judgment.
+`RUN_STATUS: OK` must never imply `REVIEW_SIGNAL: CLEAR`.
+
 ### Comment type
 
 - `Blocker`
@@ -184,8 +204,22 @@ Forbidden:
 ### Reply type
 
 - `Accept`
-- `Decline`
-- `Move`
+- `AskForEvidence`
+- `AskForScope`
+- `MoveToAdr`
+- `CannotClassify`
+
+### Evidence class
+
+- `CausalRuntimeFailure`
+- `ContractDelta`
+- `ReproCondition`
+- `SecurityCondition`
+- `CiTestFailure`
+- `ConcreteReference`
+- `KeywordOnly`
+- `PathOnly`
+- `NoiseOnly`
 
 ## Command contracts
 
@@ -214,6 +248,14 @@ Output:
 - `scan.json`
 - stdout summary
 
+The command summary must expose:
+
+- `RUN_STATUS`
+- `DATA_COVERAGE`
+- `REVIEW_SIGNAL=UNKNOWN`
+- `RESIDUAL_BLOCKERS=0`
+- compatibility `STATUS`
+
 ### `gate`
 
 Compute:
@@ -222,22 +264,41 @@ Compute:
 - comment type
 - candidate blockers
 - residual blockers
+- evidence classes
 - ownership advisory
 - aggregate counts
 
 The PR author's own comments may still be classified for context, but they are not extracted as residual blockers.
 Diff-local context by itself is never enough for `present_pr_impact=true`; the comment must include a concrete failure mode.
+Residual blockers require concrete evidence; `keyword_only`, `path_only`, and `noise_only` cannot be emitted as residual blockers.
 
 Output:
 
 - `gate.json`
 - stdout summary
 
+`gate.json` carries:
+
+- `status` as run status
+- `data_coverage`
+- `review_signal`
+- evidence-backed residual blockers
+
 ### `draft-reply`
 
 Generate concise author replies.
 If local config is partial, the command status and reason reflect that instead of silently using defaults.
 If the gate artifact is missing, unreadable, `PARTIAL`, or `ERROR`, the command writes non-authoritative draft artifacts that explain analysis could not complete and avoids making a merge-safety judgment.
+
+Reply modes are intentionally narrow:
+
+- `accept`
+- `ask_for_evidence`
+- `ask_for_scope`
+- `move_to_adr`
+- `move_to_rfc`
+- `needs_human_judgment`
+- `cannot_classify`
 
 Output:
 
@@ -257,6 +318,7 @@ Output:
 
 Produce final engineer + PM + author outputs.
 The report command merges status from scan, gate, draft-reply, and escalation artifacts so final output cannot hide a partial downstream command.
+The report header must expose run status, data coverage, review signal, and residual blocker count before the human summary.
 
 Output:
 

@@ -1,6 +1,8 @@
 use std::env;
 use std::path::PathBuf;
 
+use rf_core::domain::{DataCoverage, ReviewSignal, Status};
+
 use crate::command::{self, CommandKind, CommandOutcome};
 
 pub fn run() -> i32 {
@@ -10,8 +12,15 @@ pub fn run() -> i32 {
             0
         }
         ParseResult::Error(reason) => {
-            eprintln!("STATUS: ERROR");
-            eprintln!("REASON: {reason}");
+            print_terminal_header(
+                Status::Error,
+                DataCoverage::Failed,
+                ReviewSignal::Unknown,
+                0,
+                Some(reason.as_str()),
+                None,
+                true,
+            );
             2
         }
         ParseResult::Command(command) => match dispatch(
@@ -23,8 +32,15 @@ pub fn run() -> i32 {
                 0
             }
             Err(reason) => {
-                eprintln!("STATUS: ERROR");
-                eprintln!("REASON: {reason}");
+                print_terminal_header(
+                    Status::Error,
+                    DataCoverage::Failed,
+                    ReviewSignal::Unknown,
+                    0,
+                    Some(reason.as_str()),
+                    None,
+                    true,
+                );
                 1
             }
         },
@@ -96,18 +112,56 @@ fn print_help() {
 }
 
 fn print_outcome(outcome: &CommandOutcome) {
-    println!("STATUS: {}", outcome.status.terminal_label());
+    print_terminal_header(
+        outcome.status,
+        outcome.data_coverage,
+        outcome.review_signal,
+        outcome.residual_blockers,
+        outcome.reason.as_deref(),
+        outcome.next.as_deref(),
+        false,
+    );
     for line in &outcome.lines {
         println!("{line}");
     }
-    if let Some(reason) = outcome.reason.as_deref()
+}
+
+fn print_terminal_header(
+    status: Status,
+    data_coverage: DataCoverage,
+    review_signal: ReviewSignal,
+    residual_blockers: usize,
+    reason: Option<&str>,
+    next: Option<&str>,
+    stderr: bool,
+) {
+    emit_line(stderr, &format!("RUN_STATUS: {}", status.terminal_label()));
+    emit_line(
+        stderr,
+        &format!("DATA_COVERAGE: {}", data_coverage.terminal_label()),
+    );
+    emit_line(
+        stderr,
+        &format!("REVIEW_SIGNAL: {}", review_signal.terminal_label()),
+    );
+    emit_line(stderr, &format!("RESIDUAL_BLOCKERS: {residual_blockers}"));
+    emit_line(stderr, &format!("STATUS: {}", status.terminal_label()));
+    if let Some(reason) = reason
         && !reason.is_empty()
     {
-        println!("REASON: {reason}");
+        emit_line(stderr, &format!("REASON: {reason}"));
     }
-    if let Some(next) = outcome.next.as_deref()
+    if let Some(next) = next
         && !next.is_empty()
     {
-        println!("NEXT: {next}");
+        emit_line(stderr, &format!("NEXT: {next}"));
+    }
+}
+
+fn emit_line(stderr: bool, line: &str) {
+    if stderr {
+        eprintln!("{line}");
+    } else {
+        println!("{line}");
     }
 }
