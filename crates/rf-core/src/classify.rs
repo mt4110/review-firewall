@@ -942,7 +942,7 @@ fn is_suggestion(body: &str) -> bool {
 }
 
 fn sentence_supports_evidence(text: &str) -> bool {
-    contains_any(
+    contains_evidence_marker(
         text,
         &[
             "because",
@@ -980,7 +980,7 @@ fn evidence_marker_matches(text: &str, needle: &str) -> bool {
 }
 
 fn sentence_supports_independent_evidence(text: &str) -> bool {
-    contains_any(
+    contains_evidence_marker(
         text,
         &[
             "because",
@@ -1092,7 +1092,7 @@ mod tests {
         PullRequestSummary, ScanArtifact, Status,
     };
 
-    use super::{extract_concern, gate_scan};
+    use super::{extract_concern, gate_scan, sentence_supports_evidence};
 
     #[test]
     fn rejects_preference_only_comment() {
@@ -1221,6 +1221,16 @@ mod tests {
             extract_concern("The public API contract changes here."),
             Some(BlockerConcern::Api)
         );
+    }
+
+    #[test]
+    fn evidence_markers_use_word_boundaries_for_short_ascii_tokens() {
+        assert!(sentence_supports_evidence(
+            "CI failed on this PR because the check failed."
+        ));
+        assert!(!sentence_supports_evidence(
+            "This specific decision needs clarification."
+        ));
     }
 
     fn scan_with_comment_body(body: &str) -> ScanArtifact {
