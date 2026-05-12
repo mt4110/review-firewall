@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use rf_core::domain::{GateArtifact, ScanArtifact, Status};
+use rf_core::domain::{DataCoverage, GateArtifact, ReviewSignal, ScanArtifact, Status};
 use rf_core::gate_scan;
 
 use crate::adapter::git;
@@ -67,9 +67,18 @@ fn command_outcome(artifact: &mut GateArtifact) -> CommandOutcome {
 
     CommandOutcome {
         status: artifact.status,
+        data_coverage: artifact.data_coverage,
+        review_signal: artifact.review_signal,
+        residual_blockers: artifact.residual_blockers.len(),
         reason: artifact.reason.take(),
         lines,
-        next: None,
+        next: if artifact.review_signal == ReviewSignal::Unknown {
+            Some(String::from(
+                "Resolve missing review inputs before treating this PR as clear.",
+            ))
+        } else {
+            None
+        },
     }
 }
 
@@ -80,6 +89,8 @@ fn missing_gate_artifact() -> GateArtifact {
 fn error_gate_artifact(reason: impl Into<String>) -> GateArtifact {
     GateArtifact {
         status: Status::Error,
+        data_coverage: DataCoverage::Failed,
+        review_signal: ReviewSignal::Unknown,
         reason: Some(reason.into()),
         comments_analyzed: 0,
         residual_blockers: Vec::new(),

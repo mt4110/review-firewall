@@ -423,11 +423,16 @@ fn gate_marks_codeowners_load_failure_as_partial() {
 
     assert!(gate.status.success());
     let stdout = String::from_utf8_lossy(&gate.stdout);
+    assert!(stdout.contains("RUN_STATUS: PARTIAL"));
+    assert!(stdout.contains("DATA_COVERAGE: FULL"));
+    assert!(stdout.contains("REVIEW_SIGNAL: BLOCKED"));
     assert!(stdout.contains("STATUS: PARTIAL"));
     assert!(stdout.contains("REASON:"));
     let run_dir = latest_run_dir(&repo);
     let gate_json = fs::read_to_string(run_dir.join("gate.json")).expect("gate");
     assert!(gate_json.contains(r#""status": "PARTIAL""#));
+    assert!(gate_json.contains(r#""data_coverage": "FULL""#));
+    assert!(gate_json.contains(r#""review_signal": "BLOCKED""#));
     assert!(gate_json.contains(r#""warnings""#));
 }
 

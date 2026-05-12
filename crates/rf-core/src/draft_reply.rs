@@ -1,13 +1,15 @@
-use crate::domain::{DraftReplyArtifact, GateArtifact, ReplyType, Status};
+use crate::domain::{DraftReplyArtifact, EscalationLabel, GateArtifact, ReplyType, Status};
 
 pub fn build_draft_reply(gate: &GateArtifact, max_lines: usize) -> DraftReplyArtifact {
     let max_lines = max_lines.max(1);
 
-    if gate.status != Status::Ok {
+    if gate.status != Status::Ok || gate.review_signal == crate::domain::ReviewSignal::Unknown {
         return DraftReplyArtifact {
             status: gate.status,
+            data_coverage: gate.data_coverage,
+            review_signal: gate.review_signal,
             reason: gate.reason.clone(),
-            reply_type: ReplyType::Decline,
+            reply_type: ReplyType::CannotClassify,
             target_comment_id: None,
             body: limit_lines(
                 &format!(
@@ -35,6 +37,8 @@ pub fn build_draft_reply(gate: &GateArtifact, max_lines: usize) -> DraftReplyArt
 
         return DraftReplyArtifact {
             status: gate.status,
+            data_coverage: gate.data_coverage,
+            review_signal: gate.review_signal,
             reason: gate.reason.clone(),
             reply_type: ReplyType::Accept,
             target_comment_id: Some(blocker.comment_id.clone()),
@@ -52,15 +56,35 @@ pub fn build_draft_reply(gate: &GateArtifact, max_lines: usize) -> DraftReplyArt
     if let Some(candidate) = gate
         .escalation_candidates
         .iter()
-        .find(|candidate| !matches!(candidate.label, crate::domain::EscalationLabel::StayInPr))
+        .find(|candidate| candidate.label != EscalationLabel::StayInPr)
     {
         return DraftReplyArtifact {
             status: gate.status,
+            data_coverage: gate.data_coverage,
+            review_signal: gate.review_signal,
             reason: gate.reason.clone(),
-            reply_type: ReplyType::Move,
+            reply_type: escalation_reply_type(candidate.label),
             target_comment_id: Some(candidate.root_comment_id.clone()),
+            body: limit_lines(escalation_reply_body(candidate.label), max_lines),
+        };
+    }
+
+    if let Some(comment) = gate.classified_comments.iter().find(|comment| {
+        comment.duplicate_of_comment_id.is_none()
+            && comment
+                .evidence_class
+                .is_some_and(|class| !class.supports_residual_blocker())
+            && comment.concern.is_some()
+    }) {
+        return DraftReplyArtifact {
+            status: gate.status,
+            data_coverage: gate.data_coverage,
+            review_signal: gate.review_signal,
+            reason: gate.reason.clone(),
+            reply_type: ReplyType::AskForEvidence,
+            target_comment_id: Some(comment.comment.comment_id.clone()),
             body: limit_lines(
-                "Thanks. This looks like a design/architecture discussion rather than a PR-local blocker.\nI propose moving it to ADR/RFC and keeping this PR scoped to the accepted behavior.",
+                "Thanks. I want to make sure I address the real PR-local risk here.\nCould you point me to the concrete failure mode, repro condition, or contract change you see in this diff?",
                 max_lines,
             ),
         };
@@ -68,16 +92,44 @@ pub fn build_draft_reply(gate: &GateArtifact, max_lines: usize) -> DraftReplyArt
 
     DraftReplyArtifact {
         status: gate.status,
+        data_coverage: gate.data_coverage,
+        review_signal: gate.review_signal,
         reason: gate.reason.clone(),
-        reply_type: ReplyType::Decline,
+        reply_type: ReplyType::AskForScope,
         target_comment_id: gate
             .classified_comments
             .first()
             .map(|comment| comment.comment.comment_id.clone()),
         body: limit_lines(
-            "Thanks. I do not think this blocks merge for this PR.\nReason: the comment does not show a current PR risk.\nIf needed, I can track it separately.",
+            "Thanks. I want to keep this PR focused on concrete PR-local impact.\nIf this concern is broader than the current change, I can move it into follow-up design work.",
             max_lines,
         ),
+    }
+}
+
+fn escalation_reply_type(label: EscalationLabel) -> ReplyType {
+    match label {
+        EscalationLabel::MoveToAdr => ReplyType::MoveToAdr,
+        EscalationLabel::MoveToRfc => ReplyType::MoveToRfc,
+        EscalationLabel::NeedsHumanJudgment => ReplyType::NeedsHumanJudgment,
+        EscalationLabel::StayInPr => ReplyType::AskForScope,
+    }
+}
+
+fn escalation_reply_body(label: EscalationLabel) -> &'static str {
+    match label {
+        EscalationLabel::MoveToAdr => {
+            "Thanks. This looks broader than a PR-local blocker.\nI propose moving the design decision to an ADR and keeping this PR scoped to the agreed behavior."
+        }
+        EscalationLabel::MoveToRfc => {
+            "Thanks. This looks like a cross-boundary contract decision.\nI propose moving it to an RFC and keeping this PR scoped to the current agreed interface."
+        }
+        EscalationLabel::NeedsHumanJudgment => {
+            "Thanks. This thread looks stuck beyond safe PR iteration.\nI propose getting a human judgment call and keeping this PR scoped until that decision is made."
+        }
+        EscalationLabel::StayInPr => {
+            "Thanks. I want to keep this PR focused on concrete PR-local impact.\nIf this concern is broader than the current change, I can move it into follow-up design work."
+        }
     }
 }
 

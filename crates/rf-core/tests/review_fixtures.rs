@@ -163,8 +163,17 @@ fn review_fixtures_true_blockers_remain_blocking_with_expected_concern() {
 
         if blocker.is_none() {
             failures.push(format!(
-                "{} ({}) did not stay blocking\nexpected_concern={:?} actual_type={:?} actual_concern={:?}\ncomment={}",
-                case.id, case.category, case.expected.concern, actual.comment_type, actual.concern, case.comment_ja
+                "{} ({}) did not stay blocking\nexpected_concern={:?} actual_type={:?} actual_concern={:?} actual_failure_mode={:?} actual_evidence_class={:?} present_pr_impact={}\ncomment={}\nbody={}",
+                case.id,
+                case.category,
+                case.expected.concern,
+                actual.comment_type,
+                actual.concern,
+                actual.failure_mode,
+                actual.evidence_class,
+                actual.present_pr_impact,
+                case.comment_ja,
+                body
             ));
             continue;
         }
@@ -446,6 +455,8 @@ fn synthetic_scan(comment_id: &str, body: &str) -> ScanArtifact {
 
     ScanArtifact {
         status: Status::Ok,
+        data_coverage: rf_core::domain::DataCoverage::Full,
+        review_signal: rf_core::domain::ReviewSignal::Unknown,
         reason: None,
         scan_partial: false,
         repo_root: Some(String::from("/tmp/review-firewall")),

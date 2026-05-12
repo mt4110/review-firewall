@@ -15,4 +15,4 @@ pub use normalize::{
     build_review_threads_for_author, normalize_path,
 };
 pub use ownership::build_ownership_advisory;
-pub use report::build_report_markdown;
+pub use report::{ReportHeader, build_report_markdown};

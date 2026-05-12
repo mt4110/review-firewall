@@ -7,6 +7,33 @@ pub fn normalize_path(input: &str) -> String {
 }
 
 pub fn normalize_body(body: &str) -> String {
+    normalize_analysis_text(&clean_analysis_text(body))
+}
+
+pub fn split_sentences(body: &str) -> Vec<String> {
+    clean_analysis_text(body)
+        .replace('\r', "\n")
+        .split('\n')
+        .flat_map(|line| line.split_terminator(['.', '!', '?', '。', '！', '？']))
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn clean_analysis_text(body: &str) -> String {
+    let without_code_fences = strip_fenced_code_blocks(body);
+    let without_images = strip_markdown_images(&without_code_fences);
+    let normalized_links = normalize_markdown_links(&without_images);
+    let without_html = strip_html_tags(&normalized_links);
+    let without_urls = strip_url_tokens(&without_html);
+
+    without_urls
+        .replace(['*', '_', '~', '#', '>'], " ")
+        .replace(['[', ']', '(', ')'], " ")
+}
+
+fn normalize_analysis_text(body: &str) -> String {
     body.to_lowercase()
         .replace('`', " ")
         .split_whitespace()
@@ -14,14 +41,265 @@ pub fn normalize_body(body: &str) -> String {
         .join(" ")
 }
 
-pub fn split_sentences(body: &str) -> Vec<String> {
-    body.replace('\r', "\n")
-        .split('\n')
-        .flat_map(|line| line.split_terminator(['.', '!', '?']))
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(ToOwned::to_owned)
-        .collect()
+fn strip_fenced_code_blocks(input: &str) -> String {
+    let mut output = String::new();
+    let mut remaining = input;
+    let fence = "```";
+
+    while let Some(start) = remaining.find(fence) {
+        output.push_str(&remaining[..start]);
+        remaining = &remaining[start + fence.len()..];
+        if let Some(end) = remaining.find(fence) {
+            remaining = &remaining[end + fence.len()..];
+        } else {
+            break;
+        }
+        output.push(' ');
+    }
+
+    output.push_str(remaining);
+    output
+}
+
+fn strip_markdown_images(input: &str) -> String {
+    let chars = input.chars().collect::<Vec<_>>();
+    let mut output = String::new();
+    let mut index = 0usize;
+
+    while index < chars.len() {
+        if chars[index] == '!'
+            && index + 1 < chars.len()
+            && chars[index + 1] == '['
+            && let Some(next_index) = skip_markdown_destination(&chars, index + 1)
+        {
+            output.push(' ');
+            index = next_index;
+            continue;
+        }
+
+        output.push(chars[index]);
+        index += 1;
+    }
+
+    output
+}
+
+fn normalize_markdown_links(input: &str) -> String {
+    let chars = input.chars().collect::<Vec<_>>();
+    let mut output = String::new();
+    let mut index = 0usize;
+
+    while index < chars.len() {
+        if chars[index] == '['
+            && let Some((label, next_index)) = extract_markdown_link_label(&chars, index)
+            && !label.trim().is_empty()
+        {
+            output.push_str(label.trim());
+            output.push(' ');
+            index = next_index;
+            continue;
+        }
+
+        output.push(chars[index]);
+        index += 1;
+    }
+
+    output
+}
+
+fn extract_markdown_link_label(chars: &[char], start: usize) -> Option<(String, usize)> {
+    let close_bracket = find_char(chars, start + 1, ']')?;
+    if close_bracket + 1 >= chars.len() || chars[close_bracket + 1] != '(' {
+        return None;
+    }
+
+    let close_paren = find_matching_paren(chars, close_bracket + 1)?;
+    let label = chars[start + 1..close_bracket].iter().collect::<String>();
+
+    Some((label, close_paren + 1))
+}
+
+fn skip_markdown_destination(chars: &[char], start_bracket: usize) -> Option<usize> {
+    let close_bracket = find_char(chars, start_bracket + 1, ']')?;
+    if close_bracket + 1 < chars.len() && chars[close_bracket + 1] == '(' {
+        let close_paren = find_matching_paren(chars, close_bracket + 1)?;
+        Some(close_paren + 1)
+    } else {
+        Some(close_bracket + 1)
+    }
+}
+
+fn strip_html_tags(input: &str) -> String {
+    let characters = input.chars().collect::<Vec<_>>();
+    let mut output = String::new();
+    let mut index = 0usize;
+
+    while index < characters.len() {
+        if characters[index] == '<'
+            && let Some(close_index) = find_char(&characters, index + 1, '>')
+            && is_probable_html_tag(&characters[index + 1..close_index])
+        {
+            output.push(' ');
+            index = close_index + 1;
+            continue;
+        }
+
+        output.push(characters[index]);
+        index += 1;
+    }
+
+    output
+}
+
+fn strip_url_tokens(input: &str) -> String {
+    input
+        .lines()
+        .map(|line| {
+            line.split_whitespace()
+                .filter(|token| !looks_like_url(token))
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn looks_like_url(token: &str) -> bool {
+    let trimmed = token.trim_matches(|character: char| ",.;:()[]{}".contains(character));
+    trimmed.contains("://")
+        || trimmed.starts_with("www.")
+        || trimmed.contains("shields.io")
+        || trimmed.contains("style=flat")
+}
+
+fn is_probable_html_tag(content: &[char]) -> bool {
+    let raw = content.iter().collect::<String>();
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    if trimmed.starts_with("!--") {
+        return true;
+    }
+
+    let without_slash = trimmed.strip_prefix('/').unwrap_or(trimmed);
+    let mut chars = without_slash.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !first.is_ascii_lowercase() {
+        return false;
+    }
+
+    let rest = chars
+        .take_while(|character| {
+            character.is_ascii_lowercase() || character.is_ascii_digit() || *character == '-'
+        })
+        .collect::<String>();
+    let tag_name = format!("{first}{rest}");
+    let tag_name_len = first.len_utf8() + rest.len();
+    let remainder = &without_slash[tag_name_len..];
+    let trimmed_remainder = remainder.trim();
+
+    if trimmed_remainder.is_empty() || trimmed_remainder == "/" {
+        return known_html_tag_name(&tag_name);
+    }
+
+    if !trimmed_remainder.contains('=') && !trimmed_remainder.starts_with('/') {
+        return false;
+    }
+
+    remainder.chars().all(|character| {
+        character.is_whitespace()
+            || character.is_ascii_alphanumeric()
+            || matches!(
+                character,
+                '/' | '=' | '"' | '\'' | ':' | '-' | '_' | '.' | '?' | '&' | '#' | '%' | ';'
+            )
+    })
+}
+
+fn known_html_tag_name(tag_name: &str) -> bool {
+    matches!(
+        tag_name,
+        "a" | "abbr"
+            | "article"
+            | "aside"
+            | "b"
+            | "blockquote"
+            | "br"
+            | "code"
+            | "dd"
+            | "details"
+            | "div"
+            | "dl"
+            | "dt"
+            | "em"
+            | "figcaption"
+            | "figure"
+            | "footer"
+            | "h1"
+            | "h2"
+            | "h3"
+            | "h4"
+            | "h5"
+            | "h6"
+            | "header"
+            | "hr"
+            | "i"
+            | "img"
+            | "kbd"
+            | "li"
+            | "main"
+            | "mark"
+            | "nav"
+            | "ol"
+            | "p"
+            | "pre"
+            | "section"
+            | "small"
+            | "span"
+            | "strong"
+            | "sub"
+            | "summary"
+            | "sup"
+            | "table"
+            | "tbody"
+            | "td"
+            | "th"
+            | "thead"
+            | "tr"
+            | "tt"
+            | "u"
+            | "ul"
+    )
+}
+
+fn find_char(chars: &[char], start: usize, needle: char) -> Option<usize> {
+    chars[start..]
+        .iter()
+        .position(|character| *character == needle)
+        .map(|offset| start + offset)
+}
+
+fn find_matching_paren(chars: &[char], open_paren: usize) -> Option<usize> {
+    let mut depth = 0usize;
+
+    for (index, character) in chars.iter().enumerate().skip(open_paren) {
+        match character {
+            '(' => depth += 1,
+            ')' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(index);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
 }
 
 pub fn build_conversation_threads(
@@ -217,12 +495,27 @@ mod tests {
 
     use super::{
         build_conversation_threads, build_conversation_threads_for_author, build_review_threads,
-        build_review_threads_for_author, normalize_path,
+        build_review_threads_for_author, normalize_body, normalize_path,
     };
 
     #[test]
     fn normalizes_windows_paths() {
         assert_eq!(normalize_path(r"src\main.rs"), "src/main.rs");
+    }
+
+    #[test]
+    fn preserves_plain_text_comparison_expressions() {
+        let normalized = normalize_body("retries < 3 && timeout > 0 can break this PR.");
+
+        assert!(normalized.contains("< 3 && timeout"));
+        assert!(normalized.contains("0 can break this pr"));
+    }
+
+    #[test]
+    fn preserves_lowercase_angle_bracket_code_tokens() {
+        let normalized = normalize_body("x<y>z can break this PR.");
+
+        assert!(normalized.contains("x<y z"));
     }
 
     #[test]

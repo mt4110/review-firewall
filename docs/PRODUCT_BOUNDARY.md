@@ -4,11 +4,11 @@
 
 `review-firewall` is a post-review triage firewall for PR conversations.
 
-It is not an AI code reviewer, PR bot, reviewer reputation system, or CI gate.
+It is not a code reviewer, PR bot, reviewer reputation system, or CI gate.
 
 ## Why this boundary exists
 
-The AI review space is already crowded with tools that read diffs and produce comments.
+The review-generation space is already crowded with tools that read diffs and produce comments.
 Competing there would make this project another review generator.
 
 The sharper product shape is different:
@@ -40,7 +40,8 @@ Allowed outputs for v0.1:
 - `draft_reply.md`
 - `escalation.md`
 - `report.md`
-- terminal `STATUS:` / `REASON:` / `NEXT:` lines
+- terminal `RUN_STATUS:` / `DATA_COVERAGE:` / `REVIEW_SIGNAL:` / `RESIDUAL_BLOCKERS:` lines
+- compatibility `STATUS:` / `REASON:` / `NEXT:` lines
 
 These outputs are for the author to inspect and decide from.
 They are not automatic PR actions.
@@ -61,12 +62,12 @@ Do not add these to v0.1:
 - model orchestration
 - auto-fix or auto-merge
 
-## Boundary With AI Review Tools
+## Boundary With Review Generators
 
-AI review tools usually do this:
+Review generators usually do this:
 
 ```text
-diff/code/context -> AI reviewer -> review comments
+diff/code/context -> review generator -> review comments
 ```
 
 `review-firewall` does this:
@@ -88,7 +89,7 @@ It reviews PR diffs, can post or update PR comments, keeps review history, and i
 The intended relationship is downstream:
 
 ```text
-human reviewers / AI reviewers / CI summaries
+human reviewers / automated review tools / CI summaries
         |
         v
 GitHub PR conversation

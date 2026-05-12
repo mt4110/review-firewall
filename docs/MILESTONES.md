@@ -45,6 +45,31 @@ Deferred:
 - stricter evidence extraction
 - first-class downstream use of top-level `reviewDecision`
 
+## M1.5: v0.1 Trust Hardening
+
+Goal:
+
+- harden the author trust boundary without expanding scope
+- separate run success from review-input completeness and author-facing review state
+- keep noisy markup and weak evidence from sounding like blockers
+
+Included:
+
+- explicit `data_coverage` and `review_signal`
+- terminal/report trust header with `RUN_STATUS`, `DATA_COVERAGE`, `REVIEW_SIGNAL`, and `RESIDUAL_BLOCKERS`
+- pre-classification noise normalization for markdown/html badges and links
+- evidence-class tracking for blocker extraction
+- safer `draft-reply` modes for missing, partial, or non-authoritative analysis
+
+Done when:
+
+- partial review data cannot emit `REVIEW_SIGNAL: CLEAR`
+- residual blockers emit `REVIEW_SIGNAL: BLOCKED`
+- badge fragments do not appear in `failure_mode`, `evidence`, or `report.md`
+- draft replies use `cannot_classify` when gate input is missing, partial, or errored
+- docs and emitted artifacts match
+- `cargo fmt --all`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` pass
+
 ## M2: v0.1 Release Candidate
 
 Goal:

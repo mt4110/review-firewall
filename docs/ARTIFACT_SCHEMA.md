@@ -50,6 +50,29 @@ Allowed values:
 - `PARTIAL`
 - `ERROR`
 
+This is the run/artifact generation status.
+
+### `data_coverage`
+
+Allowed values:
+
+- `FULL`
+- `PARTIAL`
+- `FAILED`
+
+This tracks whether review inputs were fully observed.
+
+### `review_signal`
+
+Allowed values:
+
+- `BLOCKED`
+- `CLEAR`
+- `UNKNOWN`
+
+This is the author-facing review state.
+It must be derived independently from `status`.
+
 ### `reason`
 
 Human-readable explanation for partial/error states.
@@ -69,6 +92,8 @@ Minimum shape:
 ```json
 {
   "status": "OK",
+  "data_coverage": "FULL",
+  "review_signal": "UNKNOWN",
   "pr": {
     "number": 142,
     "title": "Refactor response handling"
@@ -99,6 +124,7 @@ Recommended additional fields:
 - `issue_comments`
 - `review_decisions`
 - `partial_sources`
+- `scan_partial` as a compatibility flag
 
 `product_boundary` records the product-category contract for auditability:
 
@@ -119,12 +145,15 @@ Minimum shape:
 ```json
 {
   "status": "OK",
+  "data_coverage": "FULL",
+  "review_signal": "BLOCKED",
   "comments_analyzed": 17,
   "residual_blockers": [
     {
       "comment_id": "12",
       "concern": "correctness",
       "failure_mode": "partial status may break response contract",
+      "evidence_class": "contract_delta",
       "evidence": ["response contract changes when status=partial"],
       "owner_match": true,
       "ownership_scope": "exact",
@@ -147,6 +176,8 @@ Recommended additional fields:
 - `duplicates_collapsed`
 - `warnings`
 - `config_snapshot`
+- `classified_comments`
+- `escalation_candidates`
 
 ## `draft_reply.json`
 
@@ -155,6 +186,8 @@ Minimum shape:
 ```json
 {
   "status": "OK",
+  "data_coverage": "FULL",
+  "review_signal": "BLOCKED",
   "reply_type": "accept",
   "target_comment_id": "12",
   "body": "Thanks. I agree this is a correctness issue in this PR.\nI will address it here by updating the contract handling."
@@ -164,8 +197,12 @@ Minimum shape:
 Reply types:
 
 - `accept`
-- `decline`
-- `move`
+- `ask_for_evidence`
+- `ask_for_scope`
+- `move_to_adr`
+- `move_to_rfc`
+- `needs_human_judgment`
+- `cannot_classify`
 
 ## `draft_reply.md`
 
@@ -203,6 +240,16 @@ Change response schema to represent partial explicitly.
 
 ## `report.md`
 
+The header should begin with:
+
+```md
+RUN_STATUS: OK
+DATA_COVERAGE: FULL
+REVIEW_SIGNAL: BLOCKED
+RESIDUAL_BLOCKERS: 1
+STATUS: OK
+```
+
 Must include three sections:
 
 1. residual blockers
@@ -212,6 +259,12 @@ Must include three sections:
 Suggested shape:
 
 ```md
+RUN_STATUS: OK
+DATA_COVERAGE: FULL
+REVIEW_SIGNAL: BLOCKED
+RESIDUAL_BLOCKERS: 1
+STATUS: OK
+
 # Review Firewall Report
 
 ## Residual blockers
@@ -231,5 +284,6 @@ Action: decide contract handling in this PR or move schema redesign to ADR
 ## Compatibility rules
 
 - New fields may be added, but existing fields must not change meaning silently
-- `status` meanings are stable
+- `status` remains the run-status field in JSON artifacts
+- `RUN_STATUS:` in terminal/report output is the human-facing header for that same status
 - `latest.json` replaces symlink-based latest pointers

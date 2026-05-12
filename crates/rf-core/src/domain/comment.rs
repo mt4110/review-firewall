@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::domain::blocker::EvidenceClass;
 use crate::domain::ownership::{AdvisoryWeight, OwnershipScope};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,6 +70,8 @@ pub struct ClassifiedComment {
     pub concern: Option<BlockerConcern>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub failure_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence_class: Option<EvidenceClass>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<String>,
     pub present_pr_impact: bool,

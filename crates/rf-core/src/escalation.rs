@@ -1,4 +1,6 @@
-use crate::domain::{EscalationCandidate, EscalationLabel, ReviewThread, Status};
+use crate::domain::{
+    DataCoverage, EscalationCandidate, EscalationLabel, ReviewSignal, ReviewThread, Status,
+};
 
 pub fn evaluate_escalation_candidates(
     review_threads: &[ReviewThread],
@@ -28,11 +30,20 @@ pub fn evaluate_escalation_candidates(
 
 pub fn build_escalation_markdown(
     status: Status,
+    data_coverage: DataCoverage,
+    review_signal: ReviewSignal,
+    residual_blockers: usize,
     reason: Option<&str>,
     pr_number: Option<u64>,
     candidates: &[EscalationCandidate],
 ) -> String {
-    let mut lines = vec![format!("STATUS: {}", status.terminal_label())];
+    let mut lines = vec![
+        format!("RUN_STATUS: {}", status.terminal_label()),
+        format!("DATA_COVERAGE: {}", data_coverage.terminal_label()),
+        format!("REVIEW_SIGNAL: {}", review_signal.terminal_label()),
+        format!("RESIDUAL_BLOCKERS: {residual_blockers}"),
+        format!("STATUS: {}", status.terminal_label()),
+    ];
     if let Some(reason) = reason
         && !reason.is_empty()
     {
@@ -336,7 +347,15 @@ mod tests {
         };
         let candidates = evaluate_escalation_candidates(&[thread], 2);
 
-        let markdown = build_escalation_markdown(Status::Ok, None, Some(42), &candidates);
+        let markdown = build_escalation_markdown(
+            Status::Ok,
+            crate::domain::DataCoverage::Full,
+            crate::domain::ReviewSignal::Unknown,
+            0,
+            None,
+            Some(42),
+            &candidates,
+        );
 
         assert!(markdown.contains("# RFC Candidate"));
         assert!(!markdown.contains("# ADR Candidate"));
@@ -365,7 +384,15 @@ mod tests {
         };
         let candidates = evaluate_escalation_candidates(&[thread], 2);
 
-        let markdown = build_escalation_markdown(Status::Ok, None, Some(42), &candidates);
+        let markdown = build_escalation_markdown(
+            Status::Ok,
+            crate::domain::DataCoverage::Full,
+            crate::domain::ReviewSignal::Unknown,
+            0,
+            None,
+            Some(42),
+            &candidates,
+        );
 
         assert!(markdown.contains("# Human Judgment Candidate"));
         assert!(!markdown.contains("# ADR Candidate"));
