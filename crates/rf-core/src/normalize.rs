@@ -197,12 +197,13 @@ fn is_probable_html_tag(content: &[char]) -> bool {
             character.is_ascii_lowercase() || character.is_ascii_digit() || *character == '-'
         })
         .collect::<String>();
+    let tag_name = format!("{first}{rest}");
     let tag_name_len = first.len_utf8() + rest.len();
     let remainder = &without_slash[tag_name_len..];
     let trimmed_remainder = remainder.trim();
 
     if trimmed_remainder.is_empty() || trimmed_remainder == "/" {
-        return true;
+        return known_html_tag_name(&tag_name);
     }
 
     if !trimmed_remainder.contains('=') && !trimmed_remainder.starts_with('/') {
@@ -217,6 +218,62 @@ fn is_probable_html_tag(content: &[char]) -> bool {
                 '/' | '=' | '"' | '\'' | ':' | '-' | '_' | '.' | '?' | '&' | '#' | '%' | ';'
             )
     })
+}
+
+fn known_html_tag_name(tag_name: &str) -> bool {
+    matches!(
+        tag_name,
+        "a" | "abbr"
+            | "article"
+            | "aside"
+            | "b"
+            | "blockquote"
+            | "br"
+            | "code"
+            | "dd"
+            | "details"
+            | "div"
+            | "dl"
+            | "dt"
+            | "em"
+            | "figcaption"
+            | "figure"
+            | "footer"
+            | "h1"
+            | "h2"
+            | "h3"
+            | "h4"
+            | "h5"
+            | "h6"
+            | "header"
+            | "hr"
+            | "i"
+            | "img"
+            | "kbd"
+            | "li"
+            | "main"
+            | "mark"
+            | "nav"
+            | "ol"
+            | "p"
+            | "pre"
+            | "section"
+            | "small"
+            | "span"
+            | "strong"
+            | "sub"
+            | "summary"
+            | "sup"
+            | "table"
+            | "tbody"
+            | "td"
+            | "th"
+            | "thead"
+            | "tr"
+            | "tt"
+            | "u"
+            | "ul"
+    )
 }
 
 fn find_char(chars: &[char], start: usize, needle: char) -> Option<usize> {
@@ -452,6 +509,13 @@ mod tests {
 
         assert!(normalized.contains("< 3 && timeout"));
         assert!(normalized.contains("0 can break this pr"));
+    }
+
+    #[test]
+    fn preserves_lowercase_angle_bracket_code_tokens() {
+        let normalized = normalize_body("x<y>z can break this PR.");
+
+        assert!(normalized.contains("x<y z"));
     }
 
     #[test]
