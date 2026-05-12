@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::domain::blocker::{DuplicateGroup, GateCounts, ResidualBlocker};
 use crate::domain::comment::{ClassifiedComment, CommentRecord, ReviewThread};
@@ -54,12 +54,10 @@ impl Default for ProductBoundarySnapshot {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ScanArtifact {
     pub status: Status,
-    #[serde(default)]
     pub data_coverage: DataCoverage,
-    #[serde(default)]
     pub review_signal: ReviewSignal,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
@@ -88,6 +86,82 @@ pub struct ScanArtifact {
     pub partial_sources: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+struct ScanArtifactSerde {
+    pub status: Status,
+    #[serde(default)]
+    pub data_coverage: Option<DataCoverage>,
+    #[serde(default)]
+    pub review_signal: Option<ReviewSignal>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(default)]
+    pub scan_partial: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repo_root: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    pub pr: PullRequestSummary,
+    pub files_changed: usize,
+    pub review_comments: usize,
+    pub threads: usize,
+    pub codeowners_found: bool,
+    pub policy_found: bool,
+    #[serde(default)]
+    pub product_boundary: ProductBoundarySnapshot,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub changed_files: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub comments: Vec<CommentRecord>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub issue_comments: Vec<CommentRecord>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub review_threads: Vec<ReviewThread>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub partial_sources: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
+}
+
+impl<'de> Deserialize<'de> for ScanArtifact {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let raw = ScanArtifactSerde::deserialize(deserializer)?;
+        let data_coverage = raw.data_coverage.unwrap_or_else(|| {
+            legacy_scan_data_coverage(
+                raw.status,
+                raw.scan_partial,
+                !raw.partial_sources.is_empty(),
+            )
+        });
+
+        Ok(Self {
+            status: raw.status,
+            data_coverage,
+            review_signal: raw.review_signal.unwrap_or(ReviewSignal::Unknown),
+            reason: raw.reason,
+            scan_partial: raw.scan_partial,
+            repo_root: raw.repo_root,
+            branch: raw.branch,
+            pr: raw.pr,
+            files_changed: raw.files_changed,
+            review_comments: raw.review_comments,
+            threads: raw.threads,
+            codeowners_found: raw.codeowners_found,
+            policy_found: raw.policy_found,
+            product_boundary: raw.product_boundary,
+            changed_files: raw.changed_files,
+            comments: raw.comments,
+            issue_comments: raw.issue_comments,
+            review_threads: raw.review_threads,
+            partial_sources: raw.partial_sources,
+            warnings: raw.warnings,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -153,4 +227,22 @@ pub struct DraftReplyArtifact {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_comment_id: Option<String>,
     pub body: String,
+}
+
+const fn legacy_scan_data_coverage(
+    status: Status,
+    scan_partial: bool,
+    has_partial_sources: bool,
+) -> DataCoverage {
+    match status {
+        Status::Error => DataCoverage::Failed,
+        Status::Partial => DataCoverage::Partial,
+        Status::Ok => {
+            if scan_partial || has_partial_sources {
+                DataCoverage::Partial
+            } else {
+                DataCoverage::Full
+            }
+        }
+    }
 }

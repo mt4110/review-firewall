@@ -181,3 +181,69 @@ fn gate_artifact_deserializes_legacy_residual_blockers_without_evidence_class() 
         EvidenceClass::ConcreteReference
     );
 }
+
+#[test]
+fn scan_artifact_deserializes_legacy_partial_scan_as_partial_coverage() {
+    let legacy_scan = r#"{
+        "status": "OK",
+        "scan_partial": true,
+        "pr": {
+            "number": 2,
+            "title": "Legacy partial scan"
+        },
+        "files_changed": 3,
+        "review_comments": 5,
+        "threads": 2,
+        "codeowners_found": false,
+        "policy_found": true,
+        "partial_sources": ["gh"]
+    }"#;
+
+    let restored: ScanArtifact = serde_json::from_str(legacy_scan).expect("legacy partial scan");
+    assert_eq!(restored.status, Status::Ok);
+    assert_eq!(restored.data_coverage, DataCoverage::Partial);
+    assert_eq!(restored.review_signal, ReviewSignal::Unknown);
+}
+
+#[test]
+fn scan_artifact_deserializes_legacy_error_scan_as_failed_coverage() {
+    let legacy_scan = r#"{
+        "status": "ERROR",
+        "pr": {
+            "number": 2,
+            "title": "Legacy error scan"
+        },
+        "files_changed": 0,
+        "review_comments": 0,
+        "threads": 0,
+        "codeowners_found": false,
+        "policy_found": false
+    }"#;
+
+    let restored: ScanArtifact = serde_json::from_str(legacy_scan).expect("legacy error scan");
+    assert_eq!(restored.status, Status::Error);
+    assert_eq!(restored.data_coverage, DataCoverage::Failed);
+    assert_eq!(restored.review_signal, ReviewSignal::Unknown);
+}
+
+#[test]
+fn scan_artifact_deserializes_legacy_complete_scan_as_full_coverage() {
+    let legacy_scan = r#"{
+        "status": "OK",
+        "scan_partial": false,
+        "pr": {
+            "number": 2,
+            "title": "Legacy complete scan"
+        },
+        "files_changed": 3,
+        "review_comments": 5,
+        "threads": 2,
+        "codeowners_found": true,
+        "policy_found": true
+    }"#;
+
+    let restored: ScanArtifact = serde_json::from_str(legacy_scan).expect("legacy full scan");
+    assert_eq!(restored.status, Status::Ok);
+    assert_eq!(restored.data_coverage, DataCoverage::Full);
+    assert_eq!(restored.review_signal, ReviewSignal::Unknown);
+}
