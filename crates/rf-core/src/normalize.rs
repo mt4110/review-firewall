@@ -184,18 +184,32 @@ fn is_probable_html_tag(content: &[char]) -> bool {
     }
 
     let without_slash = trimmed.strip_prefix('/').unwrap_or(trimmed);
-    let tag_name = without_slash
-        .chars()
+    let mut chars = without_slash.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !first.is_ascii_lowercase() {
+        return false;
+    }
+
+    let rest = chars
         .take_while(|character| {
             character.is_ascii_lowercase() || character.is_ascii_digit() || *character == '-'
         })
         .collect::<String>();
+    let tag_name_len = first.len_utf8() + rest.len();
+    let remainder = &without_slash[tag_name_len..];
+    let trimmed_remainder = remainder.trim();
 
-    if tag_name.is_empty() {
+    if trimmed_remainder.is_empty() || trimmed_remainder == "/" {
+        return true;
+    }
+
+    if !trimmed_remainder.contains('=') && !trimmed_remainder.starts_with('/') {
         return false;
     }
 
-    without_slash[tag_name.len()..].chars().all(|character| {
+    remainder.chars().all(|character| {
         character.is_whitespace()
             || character.is_ascii_alphanumeric()
             || matches!(
@@ -424,12 +438,20 @@ mod tests {
 
     use super::{
         build_conversation_threads, build_conversation_threads_for_author, build_review_threads,
-        build_review_threads_for_author, normalize_path,
+        build_review_threads_for_author, normalize_body, normalize_path,
     };
 
     #[test]
     fn normalizes_windows_paths() {
         assert_eq!(normalize_path(r"src\main.rs"), "src/main.rs");
+    }
+
+    #[test]
+    fn preserves_plain_text_comparison_expressions() {
+        let normalized = normalize_body("retries < 3 && timeout > 0 can break this PR.");
+
+        assert!(normalized.contains("< 3 && timeout"));
+        assert!(normalized.contains("0 can break this pr"));
     }
 
     #[test]

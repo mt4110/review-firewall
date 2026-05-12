@@ -38,14 +38,12 @@ pub fn gate_scan(
     let downgraded_comments = classified
         .iter()
         .filter(|comment| {
-            let missing_required_evidence = config.require_evidence
-                && !comment
-                    .evidence_class
-                    .is_some_and(EvidenceClass::supports_residual_blocker);
+            let evidence_allows_blocker =
+                evidence_allows_blocker(comment.evidence_class, config.require_evidence);
             comment.comment_type != CommentType::Blocker
                 && comment.concern.is_some()
                 && (comment.failure_mode.is_none()
-                    || missing_required_evidence
+                    || !evidence_allows_blocker
                     || !comment.present_pr_impact)
         })
         .map(|comment| comment.comment.comment_id.clone())
@@ -128,7 +126,7 @@ fn classify_comment(
         config.use_codeowners,
     );
 
-    let evidence_satisfies_gate = !config.require_evidence || evidence_supported;
+    let evidence_satisfies_gate = evidence_allows_blocker(evidence_class, config.require_evidence);
     let candidate_blocker = !author_comment
         && (!config.require_concern || concern.is_some())
         && (!config.require_failure_mode || failure_mode.is_some())
@@ -193,10 +191,7 @@ fn collect_residual_blockers(
     for comment in classified.iter().filter(|comment| {
         comment.comment_type == CommentType::Blocker
             && comment.duplicate_of_comment_id.is_none()
-            && (!config.require_evidence
-                || comment
-                    .evidence_class
-                    .is_some_and(EvidenceClass::supports_residual_blocker))
+            && evidence_allows_blocker(comment.evidence_class, config.require_evidence)
     }) {
         if seen_threads
             .iter()
@@ -236,13 +231,9 @@ fn to_residual_blocker(comment: &ClassifiedComment) -> ResidualBlocker {
 }
 
 fn is_candidate_blocker(comment: &ClassifiedComment, config: &GateConfigSnapshot) -> bool {
-    let evidence_supported = comment
-        .evidence_class
-        .is_some_and(EvidenceClass::supports_residual_blocker);
-
     (!config.require_concern || comment.concern.is_some())
         && (!config.require_failure_mode || comment.failure_mode.is_some())
-        && (!config.require_evidence || evidence_supported)
+        && evidence_allows_blocker(comment.evidence_class, config.require_evidence)
 }
 
 fn extract_concern(body: &str) -> Option<BlockerConcern> {
@@ -661,7 +652,7 @@ fn extract_evidence_class(comment: &CommentRecord, evidence: &[String]) -> Optio
 
     let normalized_evidence = normalize_body(&evidence.join(" "));
 
-    if contains_any(
+    if contains_evidence_marker(
         &normalized_evidence,
         &[
             "ci",
@@ -676,7 +667,7 @@ fn extract_evidence_class(comment: &CommentRecord, evidence: &[String]) -> Optio
         return Some(EvidenceClass::CiTestFailure);
     }
 
-    if contains_any(
+    if contains_evidence_marker(
         &normalized_evidence,
         &[
             "auth",
@@ -699,7 +690,7 @@ fn extract_evidence_class(comment: &CommentRecord, evidence: &[String]) -> Optio
         return Some(EvidenceClass::SecurityCondition);
     }
 
-    if contains_any(
+    if contains_evidence_marker(
         &normalized_evidence,
         &[
             "contract",
@@ -717,7 +708,7 @@ fn extract_evidence_class(comment: &CommentRecord, evidence: &[String]) -> Optio
         return Some(EvidenceClass::ContractDelta);
     }
 
-    if contains_any(
+    if contains_evidence_marker(
         &normalized_evidence,
         &[
             "if ",
@@ -746,6 +737,15 @@ fn extract_evidence_class(comment: &CommentRecord, evidence: &[String]) -> Optio
     }
 
     Some(EvidenceClass::ConcreteReference)
+}
+
+fn evidence_allows_blocker(evidence_class: Option<EvidenceClass>, require_evidence: bool) -> bool {
+    match evidence_class {
+        Some(EvidenceClass::PathOnly | EvidenceClass::NoiseOnly) => false,
+        Some(EvidenceClass::KeywordOnly) => !require_evidence,
+        Some(class) => !require_evidence || class.supports_residual_blocker(),
+        None => false,
+    }
 }
 
 fn extract_present_pr_impact(
@@ -963,6 +963,20 @@ fn sentence_supports_evidence(text: &str) -> bool {
             "ci",
         ],
     )
+}
+
+fn contains_evidence_marker(text: &str, needles: &[&str]) -> bool {
+    needles
+        .iter()
+        .any(|needle| evidence_marker_matches(text, needle))
+}
+
+fn evidence_marker_matches(text: &str, needle: &str) -> bool {
+    if needle.is_ascii() && needle.bytes().all(is_ascii_word_byte) {
+        contains_ascii_marker(text, needle)
+    } else {
+        text.contains(needle)
+    }
 }
 
 fn sentence_supports_independent_evidence(text: &str) -> bool {

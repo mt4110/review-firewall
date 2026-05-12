@@ -87,9 +87,11 @@ Track concrete evidence shape for blocker extraction:
 
 Residual blockers must never be emitted from:
 
-- `keyword_only`
 - `path_only`
 - `noise_only`
+
+`keyword_only` is only allowed as a residual blocker when `require_evidence = false`.
+When `require_evidence = true`, `keyword_only` must also be rejected as non-authoritative blocker evidence.
 
 ### 4. Draft reply safety
 

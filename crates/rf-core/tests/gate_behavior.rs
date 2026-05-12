@@ -198,6 +198,23 @@ fn failure_mode_text_is_not_reused_as_evidence() {
 }
 
 #[test]
+fn evidence_class_does_not_match_author_as_auth() {
+    let scan = base_scan(
+        "This can break the response contract in this PR because the author changed the response shape.",
+    );
+    let config = GateConfigSnapshot {
+        require_evidence: false,
+        ..GateConfigSnapshot::default()
+    };
+
+    let gate = gate_scan(&scan, &config, &[]);
+    let blocker = gate.residual_blockers.first().expect("residual blocker");
+
+    assert_ne!(blocker.evidence_class, EvidenceClass::SecurityCondition);
+    assert_eq!(blocker.evidence_class, EvidenceClass::ContractDelta);
+}
+
+#[test]
 fn config_rejects_comment_without_required_alternative() {
     let scan = base_scan(
         "This can break the response contract in this PR because `partial` changes client handling.",

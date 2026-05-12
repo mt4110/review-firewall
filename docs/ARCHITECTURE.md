@@ -207,6 +207,8 @@ It must not be downgraded just because config parsing or CODEOWNERS advisory loa
 - `AskForEvidence`
 - `AskForScope`
 - `MoveToAdr`
+- `MoveToRfc`
+- `NeedsHumanJudgment`
 - `CannotClassify`
 
 ### Evidence class
@@ -270,7 +272,8 @@ Compute:
 
 The PR author's own comments may still be classified for context, but they are not extracted as residual blockers.
 Diff-local context by itself is never enough for `present_pr_impact=true`; the comment must include a concrete failure mode.
-Residual blockers require concrete evidence; `keyword_only`, `path_only`, and `noise_only` cannot be emitted as residual blockers.
+Residual blockers must never be emitted from `path_only` or `noise_only`.
+`keyword_only` is only allowed as a residual blocker when `require_evidence=false`; when `require_evidence=true`, residual blockers require concrete evidence.
 
 Output:
 
