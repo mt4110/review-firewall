@@ -38,6 +38,7 @@ pub struct ResidualBlocker {
     pub comment_id: String,
     pub concern: BlockerConcern,
     pub failure_mode: String,
+    #[serde(default = "default_evidence_class")]
     pub evidence_class: EvidenceClass,
     pub evidence: Vec<String>,
     pub owner_match: bool,
@@ -56,4 +57,8 @@ pub struct DuplicateGroup {
 
 const fn is_zero(value: &usize) -> bool {
     *value == 0
+}
+
+const fn default_evidence_class() -> EvidenceClass {
+    EvidenceClass::ConcreteReference
 }

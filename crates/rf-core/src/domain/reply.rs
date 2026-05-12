@@ -6,8 +6,10 @@ pub enum ReplyType {
     Accept,
     AskForEvidence,
     AskForScope,
+    #[serde(alias = "move")]
     MoveToAdr,
     MoveToRfc,
     NeedsHumanJudgment,
+    #[serde(alias = "decline")]
     CannotClassify,
 }

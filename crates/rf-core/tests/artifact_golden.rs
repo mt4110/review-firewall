@@ -115,3 +115,69 @@ fn draft_reply_roundtrip_is_stable() {
         serde_json::from_str(&rendered).expect("draft reply roundtrip");
     assert_eq!(restored.body, draft.body);
 }
+
+#[test]
+fn draft_reply_deserializes_legacy_reply_types() {
+    let legacy_decline = r#"{
+        "status": "OK",
+        "reply_type": "decline",
+        "target_comment_id": "12",
+        "body": "Thanks. I do not think this blocks merge for this PR."
+    }"#;
+
+    let restored: DraftReplyArtifact =
+        serde_json::from_str(legacy_decline).expect("legacy decline draft");
+    assert_eq!(restored.reply_type, ReplyType::CannotClassify);
+
+    let legacy_move = r#"{
+        "status": "OK",
+        "reply_type": "move",
+        "target_comment_id": "12",
+        "body": "Thanks. I propose moving this to ADR/RFC."
+    }"#;
+
+    let restored: DraftReplyArtifact =
+        serde_json::from_str(legacy_move).expect("legacy move draft");
+    assert_eq!(restored.reply_type, ReplyType::MoveToAdr);
+}
+
+#[test]
+fn gate_artifact_deserializes_legacy_residual_blockers_without_evidence_class() {
+    let legacy_gate = r#"{
+        "status": "OK",
+        "comments_analyzed": 1,
+        "residual_blockers": [
+            {
+                "comment_id": "12",
+                "concern": "correctness",
+                "failure_mode": "partial status may break response contract",
+                "evidence": ["response contract changes when status=partial"],
+                "owner_match": true,
+                "ownership_scope": "exact",
+                "advisory_weight": "high",
+                "author": "reviewer-a"
+            }
+        ],
+        "counts": {
+            "questions": 0,
+            "suggestions": 0,
+            "nits": 0,
+            "praise": 0
+        },
+        "config_snapshot": {
+            "require_failure_mode": true,
+            "require_concern": true,
+            "require_evidence": true,
+            "require_alternative": false,
+            "max_pr_thread_roundtrips": 2,
+            "use_codeowners": true
+        }
+    }"#;
+
+    let restored: GateArtifact = serde_json::from_str(legacy_gate).expect("legacy gate");
+    assert_eq!(restored.residual_blockers.len(), 1);
+    assert_eq!(
+        restored.residual_blockers[0].evidence_class,
+        EvidenceClass::ConcreteReference
+    );
+}
