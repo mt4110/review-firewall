@@ -11,6 +11,149 @@
     "counts",
     "config_snapshot"
   ],
+  "$defs": {
+    "residual_blocker": {
+      "type": "object",
+      "required": [
+        "comment_id",
+        "concern",
+        "failure_mode",
+        "evidence_class",
+        "evidence",
+        "owner_match",
+        "ownership_scope",
+        "advisory_weight",
+        "author"
+      ],
+      "properties": {
+        "comment_id": { "type": "string" },
+        "concern": { "enum": ["correctness", "security", "performance", "operability", "api"] },
+        "failure_mode": { "type": "string" },
+        "evidence_class": {
+          "enum": [
+            "causal_runtime_failure",
+            "contract_delta",
+            "repro_condition",
+            "security_condition",
+            "ci_test_failure",
+            "concrete_reference",
+            "keyword_only",
+            "path_only",
+            "noise_only"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "owner_match": { "type": "boolean" },
+        "ownership_scope": { "enum": ["exact", "partial", "none"] },
+        "advisory_weight": { "enum": ["high", "medium", "low"] },
+        "path": { "type": "string" },
+        "author": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "duplicate_group": {
+      "type": "object",
+      "required": ["primary_comment_id", "duplicate_comment_ids"],
+      "properties": {
+        "primary_comment_id": { "type": "string" },
+        "duplicate_comment_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "classified_comment": {
+      "type": "object",
+      "required": [
+        "comment_id",
+        "thread_id",
+        "author",
+        "body",
+        "source",
+        "comment_type",
+        "present_pr_impact",
+        "owner_match",
+        "ownership_scope",
+        "advisory_weight"
+      ],
+      "properties": {
+        "comment_id": { "type": "string" },
+        "thread_id": { "type": "string" },
+        "author": { "type": "string" },
+        "body": { "type": "string" },
+        "path": { "type": "string" },
+        "source": { "enum": ["review_comment", "issue_comment"] },
+        "reply_to_comment_id": { "type": "string" },
+        "created_at": { "type": "string" },
+        "line": { "type": "integer", "minimum": 0 },
+        "original_line": { "type": "integer", "minimum": 0 },
+        "comment_type": {
+          "enum": ["blocker", "question", "suggestion", "nit", "praise", "unknown"]
+        },
+        "concern": { "enum": ["correctness", "security", "performance", "operability", "api"] },
+        "failure_mode": { "type": "string" },
+        "evidence_class": {
+          "enum": [
+            "causal_runtime_failure",
+            "contract_delta",
+            "repro_condition",
+            "security_condition",
+            "ci_test_failure",
+            "concrete_reference",
+            "keyword_only",
+            "path_only",
+            "noise_only"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "present_pr_impact": { "type": "boolean" },
+        "owner_match": { "type": "boolean" },
+        "ownership_scope": { "enum": ["exact", "partial", "none"] },
+        "advisory_weight": { "enum": ["high", "medium", "low"] },
+        "duplicate_of_comment_id": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "escalation_candidate": {
+      "type": "object",
+      "required": [
+        "thread_id",
+        "root_comment_id",
+        "label",
+        "title",
+        "roundtrips",
+        "participants",
+        "position_a",
+        "position_b",
+        "why"
+      ],
+      "properties": {
+        "thread_id": { "type": "string" },
+        "root_comment_id": { "type": "string" },
+        "label": {
+          "enum": ["stay_in_pr", "move_to_adr", "move_to_rfc", "needs_human_judgment"]
+        },
+        "title": { "type": "string" },
+        "path": { "type": "string" },
+        "roundtrips": { "type": "integer", "minimum": 0 },
+        "participants": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "position_a": { "type": "string" },
+        "position_b": { "type": "string" },
+        "why": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
   "properties": {
     "status": { "enum": ["OK", "PARTIAL", "ERROR"] },
     "data_coverage": { "enum": ["FULL", "PARTIAL", "FAILED"] },
@@ -19,50 +162,7 @@
     "comments_analyzed": { "type": "integer", "minimum": 0 },
     "residual_blockers": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "required": [
-          "comment_id",
-          "concern",
-          "failure_mode",
-          "evidence_class",
-          "evidence",
-          "owner_match",
-          "ownership_scope",
-          "advisory_weight",
-          "author"
-        ],
-        "properties": {
-          "comment_id": { "type": ["integer", "string"] },
-          "concern": { "enum": ["correctness", "security", "performance", "operability", "api"] },
-          "failure_mode": { "type": "string" },
-          "evidence_class": {
-            "enum": [
-              "causal_runtime_failure",
-              "contract_delta",
-              "repro_condition",
-              "security_condition",
-              "ci_test_failure",
-              "concrete_reference",
-              "keyword_only",
-              "path_only",
-              "noise_only"
-            ]
-          },
-          "evidence": {
-            "oneOf": [
-              { "type": "string" },
-              { "type": "array", "items": { "type": "string" } }
-            ]
-          },
-          "owner_match": { "type": "boolean" },
-          "ownership_scope": { "enum": ["exact", "partial", "none"] },
-          "advisory_weight": { "enum": ["high", "medium", "low"] },
-          "path": { "type": "string" },
-          "author": { "type": "string" }
-        },
-        "additionalProperties": true
-      }
+      "items": { "$ref": "#/$defs/residual_blocker" }
     },
     "counts": {
       "type": "object",
@@ -71,9 +171,26 @@
         "questions": { "type": "integer", "minimum": 0 },
         "suggestions": { "type": "integer", "minimum": 0 },
         "nits": { "type": "integer", "minimum": 0 },
-        "praise": { "type": "integer", "minimum": 0 }
+        "praise": { "type": "integer", "minimum": 0 },
+        "unknown": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": true
+    },
+    "candidate_blockers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/residual_blocker" }
+    },
+    "downgraded_comments": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "duplicates_collapsed": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/duplicate_group" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
     },
     "config_snapshot": {
       "type": "object",
@@ -94,6 +211,14 @@
         "use_codeowners": { "type": "boolean" }
       },
       "additionalProperties": true
+    },
+    "classified_comments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/classified_comment" }
+    },
+    "escalation_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/escalation_candidate" }
     }
   },
   "additionalProperties": true

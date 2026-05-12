@@ -12,8 +12,59 @@
     "threads",
     "codeowners_found",
     "policy_found",
-    "product_boundary"
+    "product_boundary",
+    "scan_partial"
   ],
+  "$defs": {
+    "comment_record": {
+      "type": "object",
+      "required": [
+        "comment_id",
+        "thread_id",
+        "author",
+        "body",
+        "source"
+      ],
+      "properties": {
+        "comment_id": { "type": "string" },
+        "thread_id": { "type": "string" },
+        "author": { "type": "string" },
+        "body": { "type": "string" },
+        "path": { "type": "string" },
+        "source": { "enum": ["review_comment", "issue_comment"] },
+        "reply_to_comment_id": { "type": "string" },
+        "created_at": { "type": "string" },
+        "line": { "type": "integer", "minimum": 0 },
+        "original_line": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "review_thread": {
+      "type": "object",
+      "required": [
+        "thread_id",
+        "root_comment_id",
+        "participants",
+        "roundtrips",
+        "comments"
+      ],
+      "properties": {
+        "thread_id": { "type": "string" },
+        "root_comment_id": { "type": "string" },
+        "path": { "type": "string" },
+        "participants": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "roundtrips": { "type": "integer", "minimum": 0 },
+        "comments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/comment_record" }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
   "properties": {
     "status": { "enum": ["OK", "PARTIAL", "ERROR"] },
     "data_coverage": { "enum": ["FULL", "PARTIAL", "FAILED"] },
@@ -26,8 +77,22 @@
       "type": "object",
       "required": ["number", "title"],
       "properties": {
-        "number": { "type": ["integer", "string", "null"] },
-        "title": { "type": "string" }
+        "number": { "type": ["integer", "null"] },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "author": { "type": "string" },
+        "base_branch": { "type": "string" },
+        "head_branch": { "type": "string" },
+        "head_oid": { "type": "string" },
+        "labels": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "review_decisions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "url": { "type": "string" }
       },
       "additionalProperties": true
     },
@@ -53,6 +118,22 @@
         "uses_llm_for_core_judgment": { "const": false }
       },
       "additionalProperties": true
+    },
+    "changed_files": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "comments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/comment_record" }
+    },
+    "issue_comments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/comment_record" }
+    },
+    "review_threads": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/review_thread" }
     },
     "partial_sources": {
       "type": "array",
