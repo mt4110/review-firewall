@@ -2,10 +2,26 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ScanArtifact",
   "type": "object",
-  "required": ["status", "pr", "files_changed", "review_comments", "threads", "codeowners_found", "policy_found", "product_boundary"],
+  "required": [
+    "status",
+    "data_coverage",
+    "review_signal",
+    "pr",
+    "files_changed",
+    "review_comments",
+    "threads",
+    "codeowners_found",
+    "policy_found",
+    "product_boundary"
+  ],
   "properties": {
     "status": { "enum": ["OK", "PARTIAL", "ERROR"] },
+    "data_coverage": { "enum": ["FULL", "PARTIAL", "FAILED"] },
+    "review_signal": { "enum": ["BLOCKED", "CLEAR", "UNKNOWN"] },
     "reason": { "type": "string" },
+    "scan_partial": { "type": "boolean" },
+    "repo_root": { "type": "string" },
+    "branch": { "type": "string" },
     "pr": {
       "type": "object",
       "required": ["number", "title"],
@@ -37,6 +53,14 @@
         "uses_llm_for_core_judgment": { "const": false }
       },
       "additionalProperties": true
+    },
+    "partial_sources": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
     }
   },
   "additionalProperties": true

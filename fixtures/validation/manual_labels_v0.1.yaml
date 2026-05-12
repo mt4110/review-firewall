@@ -1,0 +1,97 @@
+version: 1
+kind: manual_label_corpus_v0_1
+language: en
+notes:
+  - Seed sample for v0.1 dogfood validation.
+  - This corpus is manual and advisory; core gate behavior remains deterministic and code-driven.
+  - Each sampled id should be traceable to the checked-in demo gate artifact.
+source_run:
+  demo_path: docs/demos/anonymized-dogfood-run/run/20260509T120800.671751000Z
+  comments_analyzed: 397
+  candidate_blockers: 45
+  residual_blockers: 11
+cases:
+  - comment_id: demo-r001
+    source_type: ai_bot
+    path: crates/review-firewall/src/command/report.rs
+    observed_bucket: residual_blocker
+    manual_label: true_blocker
+    obvious_blocker: true
+    reason: Report status affects the author-facing contract and can hide downstream partial/error artifacts.
+  - comment_id: demo-c014
+    source_type: ai_bot
+    path: crates/rf-core/src/normalize.rs
+    observed_bucket: non_blocker
+    manual_label: false_blocker
+    obvious_blocker: false
+    reason: The comment points at noisy wording but does not establish a concrete PR-local failure.
+  - comment_id: demo-r003
+    source_type: human
+    path: crates/review-firewall/src/command/scan.rs
+    observed_bucket: residual_blocker
+    manual_label: true_blocker
+    obvious_blocker: true
+    reason: Partial GitHub observation must not be reported as clear because it changes trust semantics.
+  - comment_id: demo-c021
+    source_type: human
+    path: crates/review-firewall/src/command/escalate.rs
+    observed_bucket: candidate_only
+    manual_label: design_debate
+    obvious_blocker: false
+    reason: The thread argues about broader process shape and should move out of the PR instead of staying a blocker.
+  - comment_id: demo-c033
+    source_type: human
+    path: crates/review-firewall/src/command/draft_reply.rs
+    observed_bucket: non_blocker
+    manual_label: question
+    obvious_blocker: false
+    reason: The reviewer is asking whether the reply wording is intentional, not asserting a breakage claim.
+  - comment_id: demo-c041
+    source_type: ai_bot
+    path: crates/rf-core/src/classify.rs
+    observed_bucket: non_blocker
+    manual_label: suggestion
+    obvious_blocker: false
+    reason: The comment proposes a nicer heuristic but does not show present PR impact.
+  - comment_id: demo-c052
+    source_type: human
+    path: crates/review-firewall/src/io/codeowners.rs
+    observed_bucket: non_blocker
+    manual_label: nit
+    obvious_blocker: false
+    reason: The wording is cleanup-level and does not change blocking behavior.
+  - comment_id: demo-c061
+    source_type: ai_bot
+    path: crates/rf-core/src/normalize.rs
+    observed_bucket: non_blocker
+    manual_label: noise
+    obvious_blocker: false
+    reason: The content is badge/html residue and should never survive into blocker extraction.
+  - comment_id: demo-c072
+    source_type: ci
+    path: crates/review-firewall/src/adapter/git.rs
+    observed_bucket: candidate_only
+    manual_label: false_blocker
+    obvious_blocker: false
+    reason: The warning hints at a possible mismatch but does not document a concrete failing condition yet.
+  - comment_id: demo-c083
+    source_type: unknown
+    path: crates/review-firewall/src/adapter/gh.rs
+    observed_bucket: non_blocker
+    manual_label: unknown
+    obvious_blocker: false
+    reason: The comment is too vague to classify confidently without stronger evidence or clearer scope.
+  - comment_id: demo-r009
+    source_type: ai_bot
+    path: crates/rf-core/src/normalize.rs
+    observed_bucket: residual_blocker
+    manual_label: true_blocker
+    obvious_blocker: true
+    reason: Incorrect thread grouping changes roundtrip counts and can distort downstream escalation decisions.
+  - comment_id: demo-r011
+    source_type: human
+    path: crates/review-firewall/src/adapter/git.rs
+    observed_bucket: residual_blocker
+    manual_label: true_blocker
+    obvious_blocker: true
+    reason: Wrong fallback file sets can hide or invent review exposure, which is a real author-facing safety issue.

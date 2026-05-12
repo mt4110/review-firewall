@@ -5,6 +5,9 @@ This document defines the minimum stable artifact contracts for v0.1.
 These contracts are intentionally simple.
 If a field is added, it must be backward compatible or versioned.
 
+The JSON Schema files under `schemas/` describe the current emitted artifact shape.
+Rust deserialization may remain backward compatible with selected legacy fields so older local artifacts can still be read during upgrades.
+
 ## Run store layout
 
 ```text

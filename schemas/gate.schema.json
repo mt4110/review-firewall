@@ -2,20 +2,53 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "GateArtifact",
   "type": "object",
-  "required": ["status", "comments_analyzed", "residual_blockers", "counts"],
+  "required": [
+    "status",
+    "data_coverage",
+    "review_signal",
+    "comments_analyzed",
+    "residual_blockers",
+    "counts",
+    "config_snapshot"
+  ],
   "properties": {
     "status": { "enum": ["OK", "PARTIAL", "ERROR"] },
+    "data_coverage": { "enum": ["FULL", "PARTIAL", "FAILED"] },
+    "review_signal": { "enum": ["BLOCKED", "CLEAR", "UNKNOWN"] },
     "reason": { "type": "string" },
     "comments_analyzed": { "type": "integer", "minimum": 0 },
     "residual_blockers": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["comment_id", "concern", "failure_mode", "evidence", "owner_match", "ownership_scope", "advisory_weight"],
+        "required": [
+          "comment_id",
+          "concern",
+          "failure_mode",
+          "evidence_class",
+          "evidence",
+          "owner_match",
+          "ownership_scope",
+          "advisory_weight",
+          "author"
+        ],
         "properties": {
           "comment_id": { "type": ["integer", "string"] },
           "concern": { "enum": ["correctness", "security", "performance", "operability", "api"] },
           "failure_mode": { "type": "string" },
+          "evidence_class": {
+            "enum": [
+              "causal_runtime_failure",
+              "contract_delta",
+              "repro_condition",
+              "security_condition",
+              "ci_test_failure",
+              "concrete_reference",
+              "keyword_only",
+              "path_only",
+              "noise_only"
+            ]
+          },
           "evidence": {
             "oneOf": [
               { "type": "string" },
@@ -24,7 +57,9 @@
           },
           "owner_match": { "type": "boolean" },
           "ownership_scope": { "enum": ["exact", "partial", "none"] },
-          "advisory_weight": { "enum": ["high", "medium", "low"] }
+          "advisory_weight": { "enum": ["high", "medium", "low"] },
+          "path": { "type": "string" },
+          "author": { "type": "string" }
         },
         "additionalProperties": true
       }
@@ -37,6 +72,26 @@
         "suggestions": { "type": "integer", "minimum": 0 },
         "nits": { "type": "integer", "minimum": 0 },
         "praise": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "config_snapshot": {
+      "type": "object",
+      "required": [
+        "require_failure_mode",
+        "require_concern",
+        "require_evidence",
+        "require_alternative",
+        "max_pr_thread_roundtrips",
+        "use_codeowners"
+      ],
+      "properties": {
+        "require_failure_mode": { "type": "boolean" },
+        "require_concern": { "type": "boolean" },
+        "require_evidence": { "type": "boolean" },
+        "require_alternative": { "type": "boolean" },
+        "max_pr_thread_roundtrips": { "type": "integer", "minimum": 0 },
+        "use_codeowners": { "type": "boolean" }
       },
       "additionalProperties": true
     }

@@ -2,14 +2,15 @@
 
 **レビューをレビューする。作者を守る。**
 
-`review-firewall` は、PR の議論を **型付き・監査可能なレビュー信号** に圧縮する local-first の Rust CLI です。
+`review-firewall` は、ノイジーな PR 会話を作者側で扱える信号へ圧縮する、author-side の local-first Rust CLI です。
+すでに存在するコメントを、作者が落ち着いて処理できる **型付き・監査可能なレビュー信号** に変えます。
 
 これは:
 
-- コードレビューを置き換える道具ではない
-- CI を置き換える道具ではない
-- 設計そのものを自動決定する道具ではない
 - AI レビューを生成する道具ではない
+- 人間のレビューを置き換える道具ではない
+- merge 可否を自動決定する道具ではない
+- PR に自動投稿する道具ではない
 
 やることは一つです。
 
@@ -31,11 +32,41 @@
 
 ## 位置づけ
 
-`review-firewall` は、レビューコメントが既に存在した後段で動きます。
+`review-firewall` は、レビューコメントが既に存在した後段で、作者側の triage として動きます。
 
-人間、AI レビューボット、CI summary、ローカルレビューCLIのどれが出したコメントでも入力にはできます。ただし、このツール自身はレビューを生成しません。役割は、作者にとって本当に対応すべきものを整理することです。どれが根拠付き blocker で、どれが question / suggestion に落ち、どの設計論争を PR 外へ出すべきかを artifact にします。
+人間、AI レビューボット、CI summary、ローカルレビュー CLI のどれが出したコメントでも入力にはできます。ただし、このツール自身はレビューを生成しません。役割は、作者にとって本当に対応すべきものを整理することです。どれが根拠付き blocker で、どれが question / suggestion に落ち、どの設計論争を PR 外へ出すべきかを artifact にします。
 
 境界の詳細は [Product Boundary](docs/PRODUCT_BOUNDARY.md) を見てください。
+
+## 例
+
+この repo の anonymized dogfood run では、次の圧縮が確認できました。
+
+```text
+397 comments analyzed
+45 candidate blockers
+11 residual blockers
+88.66% comments-to-candidate reduction
+97.23% comments-to-residual reduction
+```
+
+この数字が示しているのは、「レビューコメントを増やすこと」ではなく、「レビュー圧を減らし、次の行動を明確にすること」です。
+
+実物は [anonymized dogfood demo](docs/demos/anonymized-dogfood-run/README.md) と [validation scaffold](docs/VALIDATION.md) に置いてあります。
+
+## merge gate ではない
+
+`RUN_STATUS: OK` は、artifact 生成が完了したことしか意味しません。
+
+merge safe かどうかは、run status からは決まりません。
+作者向けの状態は別に次の 2 軸で出します。
+
+```text
+DATA_COVERAGE: FULL | PARTIAL | FAILED
+REVIEW_SIGNAL: BLOCKED | CLEAR | UNKNOWN
+```
+
+データが partial なら、review signal は `CLEAR` ではなく `UNKNOWN` です。
 
 ## プロダクトの立場
 
@@ -154,3 +185,4 @@ cargo test --workspace
 - Rust + Nix を前提に contributor 体験を揃える
 
 レビューしやすい PR の区切りは [Milestones](docs/MILESTONES.md) に置きます。
+v0.1 dogfood の確認方法は [Validation](docs/VALIDATION.md) に置きます。

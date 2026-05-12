@@ -1,0 +1,32 @@
+{
+  "status": "OK",
+  "data_coverage": "FULL",
+  "review_signal": "UNKNOWN",
+  "scan_partial": false,
+  "repo_root": "/workspace/review-firewall",
+  "branch": "feat/v0.1-validation-and-demo",
+  "pr": {
+    "number": 1,
+    "title": "Bootstrap local review triage CLI",
+    "author": "author",
+    "base_branch": "main",
+    "head_branch": "feat/v0.1.0",
+    "head_oid": "demohead0000000000000000000000000000000001",
+    "review_decisions": [
+      "COMMENTED"
+    ],
+    "url": "https://github.com/example/review-firewall/pull/1"
+  },
+  "files_changed": 76,
+  "review_comments": 274,
+  "threads": 296,
+  "codeowners_found": true,
+  "policy_found": true,
+  "product_boundary": {
+    "category": "post_review_triage_firewall",
+    "consumes_existing_review_comments": true,
+    "generates_ai_reviews": false,
+    "posts_pr_comments": false,
+    "uses_llm_for_core_judgment": false
+  }
+}

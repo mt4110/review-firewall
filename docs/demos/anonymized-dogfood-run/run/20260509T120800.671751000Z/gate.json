@@ -1,0 +1,1082 @@
+{
+  "status": "OK",
+  "data_coverage": "FULL",
+  "review_signal": "BLOCKED",
+  "comments_analyzed": 397,
+  "residual_blockers": [
+    {
+      "comment_id": "demo-r001",
+      "concern": "api",
+      "failure_mode": "Report status can hide downstream partial or error artifacts when it is sourced from gate alone.",
+      "evidence_class": "contract_delta",
+      "evidence": [
+        "report currently summarizes run completion as one status line",
+        "draft and escalation artifacts can disagree with gate status",
+        "the stopless contract requires author-facing status to reflect downstream artifacts too"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/report.rs",
+      "author": "ai-bot-a"
+    },
+    {
+      "comment_id": "demo-r002",
+      "concern": "correctness",
+      "failure_mode": "Badge fragments should be stripped before failure-mode matching or noise can survive into blocker summaries.",
+      "evidence_class": "concrete_reference",
+      "evidence": [
+        "older dogfood runs leaked `style=flat` into failure_mode",
+        "the sentence is badge markup, not reviewer evidence"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/normalize.rs",
+      "author": "ai-bot-b"
+    },
+    {
+      "comment_id": "demo-r003",
+      "concern": "security",
+      "failure_mode": "GitHub metadata fetch failures should degrade data coverage to PARTIAL instead of sounding like fatal review truth.",
+      "evidence_class": "security_condition",
+      "evidence": [
+        "gh metadata fetch can fail independently from local artifact writing",
+        "partial observation must never imply missing review risk"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/scan.rs",
+      "author": "human-reviewer-a"
+    },
+    {
+      "comment_id": "demo-r004",
+      "concern": "api",
+      "failure_mode": "Missing repository identity can silently drop changed-file and PR-comment fetches, which hides review evidence from gate.",
+      "evidence_class": "contract_delta",
+      "evidence": [
+        "repository identity is required for gh api follow-up calls",
+        "an empty comment set changes downstream gate behavior"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/adapter/gh.rs",
+      "author": "human-reviewer-b"
+    },
+    {
+      "comment_id": "demo-r005",
+      "concern": "api",
+      "failure_mode": "If draft_reply.json is missing, report can look merely partial and mask a real upstream error path.",
+      "evidence_class": "contract_delta",
+      "evidence": [
+        "report status should reflect downstream command outcomes",
+        "missing draft artifacts are an upstream failure, not just a missing summary"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/report.rs",
+      "author": "ai-bot-c"
+    },
+    {
+      "comment_id": "demo-r006",
+      "concern": "security",
+      "failure_mode": "A stale local base diff can add files that are not part of the actual PR against the remote base.",
+      "evidence_class": "repro_condition",
+      "evidence": [
+        "fallback diff is local-only",
+        "remote base divergence changes the file set fed into scan"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/adapter/git.rs",
+      "author": "human-reviewer-c"
+    },
+    {
+      "comment_id": "demo-r007",
+      "concern": "security",
+      "failure_mode": "Security terms such as xss, csrf, and sql injection should not be filtered out as metalinguistic noise.",
+      "evidence_class": "security_condition",
+      "evidence": [
+        "the filter can drop real security comments before concern extraction",
+        "security review should survive wording differences"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/classify.rs",
+      "author": "ai-bot-d"
+    },
+    {
+      "comment_id": "demo-r008",
+      "concern": "correctness",
+      "failure_mode": "A missing or partial gate analysis must not produce a reply draft that sounds safe to post.",
+      "evidence_class": "contract_delta",
+      "evidence": [
+        "draft replies are author-facing output",
+        "unsafe wording can cause an incorrect review response"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/draft_reply.rs",
+      "author": "human-reviewer-d"
+    },
+    {
+      "comment_id": "demo-r009",
+      "concern": "api",
+      "failure_mode": "Synthetic root ids can merge or split threads incorrectly and skew roundtrip counts.",
+      "evidence_class": "concrete_reference",
+      "evidence": [
+        "roundtrip count is used downstream for escalation",
+        "incorrect grouping changes author-facing action routing"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/normalize.rs",
+      "author": "ai-bot-e"
+    },
+    {
+      "comment_id": "demo-r010",
+      "concern": "operability",
+      "failure_mode": "Malformed ownerless CODEOWNERS lines can distort advisory weight for affected paths.",
+      "evidence_class": "repro_condition",
+      "evidence": [
+        "CODEOWNERS parsing feeds owner_match and advisory weight",
+        "malformed lines should not silently downgrade relevant paths"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/io/codeowners.rs",
+      "author": "human-reviewer-e"
+    },
+    {
+      "comment_id": "demo-r011",
+      "concern": "security",
+      "failure_mode": "When GitHub is unavailable, fallback diffing must not assume the local base branch matches the remote PR base.",
+      "evidence_class": "repro_condition",
+      "evidence": [
+        "fallback diff behavior depends on local branch freshness",
+        "wrong file sets can hide or invent review exposure"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/adapter/git.rs",
+      "author": "human-reviewer-f"
+    }
+  ],
+  "counts": {
+    "questions": 154,
+    "suggestions": 135,
+    "nits": 97,
+    "praise": 0
+  },
+  "candidate_blockers": [
+    {
+      "comment_id": "demo-r001",
+      "concern": "api",
+      "failure_mode": "Report status can hide downstream partial or error artifacts when it is sourced from gate alone.",
+      "evidence_class": "contract_delta",
+      "evidence": [
+        "report currently summarizes run completion as one status line",
+        "draft and escalation artifacts can disagree with gate status",
+        "the stopless contract requires author-facing status to reflect downstream artifacts too"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/report.rs",
+      "author": "ai-bot-a"
+    },
+    {
+      "comment_id": "demo-r002",
+      "concern": "correctness",
+      "failure_mode": "Badge fragments should be stripped before failure-mode matching or noise can survive into blocker summaries.",
+      "evidence_class": "concrete_reference",
+      "evidence": [
+        "older dogfood runs leaked `style=flat` into failure_mode",
+        "the sentence is badge markup, not reviewer evidence"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/normalize.rs",
+      "author": "ai-bot-b"
+    },
+    {
+      "comment_id": "demo-r003",
+      "concern": "security",
+      "failure_mode": "GitHub metadata fetch failures should degrade data coverage to PARTIAL instead of sounding like fatal review truth.",
+      "evidence_class": "security_condition",
+      "evidence": [
+        "gh metadata fetch can fail independently from local artifact writing",
+        "partial observation must never imply missing review risk"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/scan.rs",
+      "author": "human-reviewer-a"
+    },
+    {
+      "comment_id": "demo-r004",
+      "concern": "api",
+      "failure_mode": "Missing repository identity can silently drop changed-file and PR-comment fetches, which hides review evidence from gate.",
+      "evidence_class": "contract_delta",
+      "evidence": [
+        "repository identity is required for gh api follow-up calls",
+        "an empty comment set changes downstream gate behavior"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/adapter/gh.rs",
+      "author": "human-reviewer-b"
+    },
+    {
+      "comment_id": "demo-r005",
+      "concern": "api",
+      "failure_mode": "If draft_reply.json is missing, report can look merely partial and mask a real upstream error path.",
+      "evidence_class": "contract_delta",
+      "evidence": [
+        "report status should reflect downstream command outcomes",
+        "missing draft artifacts are an upstream failure, not just a missing summary"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/report.rs",
+      "author": "ai-bot-c"
+    },
+    {
+      "comment_id": "demo-r006",
+      "concern": "security",
+      "failure_mode": "A stale local base diff can add files that are not part of the actual PR against the remote base.",
+      "evidence_class": "repro_condition",
+      "evidence": [
+        "fallback diff is local-only",
+        "remote base divergence changes the file set fed into scan"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/adapter/git.rs",
+      "author": "human-reviewer-c"
+    },
+    {
+      "comment_id": "demo-r007",
+      "concern": "security",
+      "failure_mode": "Security terms such as xss, csrf, and sql injection should not be filtered out as metalinguistic noise.",
+      "evidence_class": "security_condition",
+      "evidence": [
+        "the filter can drop real security comments before concern extraction",
+        "security review should survive wording differences"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/classify.rs",
+      "author": "ai-bot-d"
+    },
+    {
+      "comment_id": "demo-r008",
+      "concern": "correctness",
+      "failure_mode": "A missing or partial gate analysis must not produce a reply draft that sounds safe to post.",
+      "evidence_class": "contract_delta",
+      "evidence": [
+        "draft replies are author-facing output",
+        "unsafe wording can cause an incorrect review response"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/draft_reply.rs",
+      "author": "human-reviewer-d"
+    },
+    {
+      "comment_id": "demo-r009",
+      "concern": "api",
+      "failure_mode": "Synthetic root ids can merge or split threads incorrectly and skew roundtrip counts.",
+      "evidence_class": "concrete_reference",
+      "evidence": [
+        "roundtrip count is used downstream for escalation",
+        "incorrect grouping changes author-facing action routing"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/normalize.rs",
+      "author": "ai-bot-e"
+    },
+    {
+      "comment_id": "demo-r010",
+      "concern": "operability",
+      "failure_mode": "Malformed ownerless CODEOWNERS lines can distort advisory weight for affected paths.",
+      "evidence_class": "repro_condition",
+      "evidence": [
+        "CODEOWNERS parsing feeds owner_match and advisory weight",
+        "malformed lines should not silently downgrade relevant paths"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/io/codeowners.rs",
+      "author": "human-reviewer-e"
+    },
+    {
+      "comment_id": "demo-r011",
+      "concern": "security",
+      "failure_mode": "When GitHub is unavailable, fallback diffing must not assume the local base branch matches the remote PR base.",
+      "evidence_class": "repro_condition",
+      "evidence": [
+        "fallback diff behavior depends on local branch freshness",
+        "wrong file sets can hide or invent review exposure"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/adapter/git.rs",
+      "author": "human-reviewer-f"
+    },
+    {
+      "comment_id": "demo-c001",
+      "concern": "api",
+      "failure_mode": "The status summary wording may overfit one command path instead of the shared artifact contract.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "status wording",
+        "artifact contract"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/cli.rs",
+      "author": "ai-bot-f"
+    },
+    {
+      "comment_id": "demo-c002",
+      "concern": "correctness",
+      "failure_mode": "The scan summary could be misread as complete without an explicit note about missing review threads.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "scan summary",
+        "missing threads"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/scan.rs",
+      "author": "ai-bot-g"
+    },
+    {
+      "comment_id": "demo-c003",
+      "concern": "security",
+      "failure_mode": "Remote parsing should keep enterprise host edge cases in view.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "enterprise host"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/adapter/git.rs",
+      "author": "human-reviewer-g"
+    },
+    {
+      "comment_id": "demo-c004",
+      "concern": "performance",
+      "failure_mode": "The run store might do unnecessary JSON rewrites on repeated commands.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "run store",
+        "JSON writes"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/io/run_store.rs",
+      "author": "ai-bot-h"
+    },
+    {
+      "comment_id": "demo-c005",
+      "concern": "operability",
+      "failure_mode": "A malformed config line could use a more direct warning for shell users.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "config warning"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/io/config.rs",
+      "author": "human-reviewer-h"
+    },
+    {
+      "comment_id": "demo-c006",
+      "concern": "api",
+      "failure_mode": "The report header contract should stay identical across partial and complete flows.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "report header contract"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/report.rs",
+      "author": "ai-bot-i"
+    },
+    {
+      "comment_id": "demo-c007",
+      "concern": "correctness",
+      "failure_mode": "Thread rebuilding may deserve one more reply-chain guard.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "reply chain guard"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/normalize.rs",
+      "author": "human-reviewer-i"
+    },
+    {
+      "comment_id": "demo-c008",
+      "concern": "security",
+      "failure_mode": "Security concern extraction should keep dangerous input vocabulary visible.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "dangerous input vocabulary"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/classify.rs",
+      "author": "ai-bot-j"
+    },
+    {
+      "comment_id": "demo-c009",
+      "concern": "api",
+      "failure_mode": "The product boundary snapshot should remain visible in author-facing scans.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "product boundary snapshot"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/domain/artifact.rs",
+      "author": "human-reviewer-j"
+    },
+    {
+      "comment_id": "demo-c010",
+      "concern": "correctness",
+      "failure_mode": "Reply drafting should avoid implying acceptance when no target comment exists.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "reply drafting",
+        "target comment"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/draft_reply.rs",
+      "author": "ai-bot-k"
+    },
+    {
+      "comment_id": "demo-c011",
+      "concern": "security",
+      "failure_mode": "GitHub fallback behavior should keep remote trust assumptions explicit.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "fallback behavior",
+        "remote trust"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/adapter/gh.rs",
+      "author": "human-reviewer-k"
+    },
+    {
+      "comment_id": "demo-c012",
+      "concern": "api",
+      "failure_mode": "Escalation output could explain why a long thread stayed inside the PR.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "escalation output"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/escalate.rs",
+      "author": "ai-bot-l"
+    },
+    {
+      "comment_id": "demo-c013",
+      "concern": "correctness",
+      "failure_mode": "The gate summary might want a more explicit candidate-to-residual distinction.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "candidate residual distinction"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/gate.rs",
+      "author": "human-reviewer-l"
+    },
+    {
+      "comment_id": "demo-c015",
+      "concern": "security",
+      "failure_mode": "Issue-comment grouping should stay conservative when metadata is sparse.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "issue-comment grouping"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/normalize.rs",
+      "author": "ai-bot-m"
+    },
+    {
+      "comment_id": "demo-c016",
+      "concern": "operability",
+      "failure_mode": "The Windows-safe run pointer story belongs in more command examples.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "Windows-safe run pointer"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "docs/ARTIFACT_SCHEMA.md",
+      "author": "human-reviewer-m"
+    },
+    {
+      "comment_id": "demo-c017",
+      "concern": "api",
+      "failure_mode": "The draft reply contract could mention missing-gate behavior closer to the command docs.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "draft reply contract"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "docs/ARTIFACT_SCHEMA.md",
+      "author": "ai-bot-n"
+    },
+    {
+      "comment_id": "demo-c018",
+      "concern": "correctness",
+      "failure_mode": "Fallback branch detection may deserve another fixture around detached HEAD.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "detached HEAD fixture"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/adapter/git.rs",
+      "author": "human-reviewer-n"
+    },
+    {
+      "comment_id": "demo-c019",
+      "concern": "security",
+      "failure_mode": "The scan partial path should keep missing review data from sounding final.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "scan partial path"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/scan.rs",
+      "author": "ai-bot-o"
+    },
+    {
+      "comment_id": "demo-c020",
+      "concern": "api",
+      "failure_mode": "The PM summary wording might still blur run success and review clarity.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "PM summary wording"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/report.rs",
+      "author": "human-reviewer-o"
+    },
+    {
+      "comment_id": "demo-c021",
+      "concern": "api",
+      "failure_mode": "The thread argues about broader process shape and may be escalation material rather than a PR-local blocker.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "broader process shape",
+        "escalation"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/command/escalate.rs",
+      "author": "human-reviewer"
+    },
+    {
+      "comment_id": "demo-c022",
+      "concern": "correctness",
+      "failure_mode": "A narrower failure-mode extractor could reduce broad contract wording matches.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "failure-mode extractor"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/src/classify.rs",
+      "author": "ai-bot-p"
+    },
+    {
+      "comment_id": "demo-c023",
+      "concern": "api",
+      "failure_mode": "The checked-in examples could point at one canonical validation entrypoint.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "canonical validation entrypoint"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "docs/VALIDATION.md",
+      "author": "human-reviewer-p"
+    },
+    {
+      "comment_id": "demo-c024",
+      "concern": "security",
+      "failure_mode": "Remote URL parsing should stay explicit about ports and custom hosts.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "ports",
+        "custom hosts"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/tests/adapter_and_io.rs",
+      "author": "ai-bot-q"
+    },
+    {
+      "comment_id": "demo-c025",
+      "concern": "performance",
+      "failure_mode": "Large PR dogfood runs may want one more note on artifact size expectations.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "artifact size expectations"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "README.md",
+      "author": "human-reviewer-q"
+    },
+    {
+      "comment_id": "demo-c026",
+      "concern": "api",
+      "failure_mode": "The stopless header could mention that STATUS is a compatibility alias.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "STATUS compatibility alias"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "docs/TRUST_HARDENING_PLAN.md",
+      "author": "ai-bot-r"
+    },
+    {
+      "comment_id": "demo-c027",
+      "concern": "correctness",
+      "failure_mode": "One more fixture around noisy markdown links could help confidence.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "markdown links fixture"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/rf-core/tests/review_fixtures.rs",
+      "author": "human-reviewer-r"
+    },
+    {
+      "comment_id": "demo-c028",
+      "concern": "security",
+      "failure_mode": "The docs should keep merge-safety language sharply separated from run status.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "merge-safety language"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "README_JA.md",
+      "author": "ai-bot-s"
+    },
+    {
+      "comment_id": "demo-c029",
+      "concern": "operability",
+      "failure_mode": "The release notes could call out validation scaffolding more directly.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "validation scaffolding"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "docs/MILESTONES.md",
+      "author": "human-reviewer-s"
+    },
+    {
+      "comment_id": "demo-c030",
+      "concern": "api",
+      "failure_mode": "The demo artifacts might benefit from one explicit note on anonymization tradeoffs.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "anonymization tradeoffs"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "docs/demos/anonymized-dogfood-run/README.md",
+      "author": "ai-bot-t"
+    },
+    {
+      "comment_id": "demo-c031",
+      "concern": "correctness",
+      "failure_mode": "The checked-in corpus should guard against duplicate sample IDs.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "duplicate sample IDs"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "fixtures/validation/manual_labels_v0.1.yaml",
+      "author": "human-reviewer-t"
+    },
+    {
+      "comment_id": "demo-c032",
+      "concern": "security",
+      "failure_mode": "Schema files should remain aligned with the artifacts the CLI emits today.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "schema alignment"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "schemas/gate.schema.json",
+      "author": "ai-bot-u"
+    },
+    {
+      "comment_id": "demo-c034",
+      "concern": "correctness",
+      "failure_mode": "The demo sample should keep at least one extra non-residual blocker candidate for auditability.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "non-residual blocker candidate",
+        "auditability"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "docs/demos/anonymized-dogfood-run/run/20260509T120800.671751000Z/gate.json",
+      "author": "human-reviewer-v"
+    },
+    {
+      "comment_id": "demo-c072",
+      "concern": "api",
+      "failure_mode": "This warning hints at a possible mismatch, but it still needs concrete failure evidence before it should stay residual.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "possible mismatch",
+        "needs concrete evidence"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "crates/review-firewall/src/adapter/git.rs",
+      "author": "ci-bot"
+    },
+    {
+      "comment_id": "demo-c073",
+      "concern": "correctness",
+      "failure_mode": "The validation copy should avoid implying a full corpus when only a sample is checked in.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "validation copy",
+        "sample corpus"
+      ],
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low",
+      "path": "docs/VALIDATION.md",
+      "author": "human-reviewer-u"
+    }
+  ],
+  "warnings": [
+    "Checked-in demo includes the full 45-entry candidate_blockers list and a sampled classified_comments slice used by the manual-label corpus."
+  ],
+  "config_snapshot": {
+    "require_failure_mode": true,
+    "require_concern": true,
+    "require_evidence": true,
+    "require_alternative": false,
+    "max_pr_thread_roundtrips": 2,
+    "use_codeowners": true
+  },
+  "classified_comments": [
+    {
+      "comment_id": "demo-c014",
+      "thread_id": "demo-c014",
+      "author": "reviewer-sample-a",
+      "body": "The comment points at noisy wording but does not establish a concrete PR-local failure.",
+      "path": "crates/rf-core/src/normalize.rs",
+      "source": "review_comment",
+      "created_at": "2026-05-09T11:00:00Z",
+      "line": 14,
+      "original_line": 14,
+      "comment_type": "suggestion",
+      "evidence": [],
+      "present_pr_impact": false,
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low"
+    },
+    {
+      "comment_id": "demo-c021",
+      "thread_id": "demo-c021",
+      "author": "reviewer-sample-b",
+      "body": "This thread feels broader than the current PR and may belong in ADR follow-up.",
+      "path": "crates/review-firewall/src/command/escalate.rs",
+      "source": "issue_comment",
+      "created_at": "2026-05-09T11:01:00Z",
+      "comment_type": "blocker",
+      "concern": "api",
+      "failure_mode": "The thread argues about broader process shape and may be escalation material rather than a PR-local blocker.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "broader process shape",
+        "escalation"
+      ],
+      "present_pr_impact": false,
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low"
+    },
+    {
+      "comment_id": "demo-c033",
+      "thread_id": "demo-c033",
+      "author": "reviewer-sample-c",
+      "body": "Is the reply wording intentionally this firm, or should it stay softer?",
+      "path": "crates/review-firewall/src/command/draft_reply.rs",
+      "source": "review_comment",
+      "created_at": "2026-05-09T11:02:00Z",
+      "line": 33,
+      "original_line": 33,
+      "comment_type": "question",
+      "evidence": [],
+      "present_pr_impact": false,
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low"
+    },
+    {
+      "comment_id": "demo-c041",
+      "thread_id": "demo-c041",
+      "author": "reviewer-sample-d",
+      "body": "A narrower heuristic might read a little better here.",
+      "path": "crates/rf-core/src/classify.rs",
+      "source": "review_comment",
+      "created_at": "2026-05-09T11:03:00Z",
+      "line": 41,
+      "original_line": 41,
+      "comment_type": "suggestion",
+      "evidence": [],
+      "present_pr_impact": false,
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low"
+    },
+    {
+      "comment_id": "demo-c052",
+      "thread_id": "demo-c052",
+      "author": "reviewer-sample-e",
+      "body": "Small wording cleanup: this can probably be shorter.",
+      "path": "crates/review-firewall/src/io/codeowners.rs",
+      "source": "review_comment",
+      "created_at": "2026-05-09T11:04:00Z",
+      "line": 52,
+      "original_line": 52,
+      "comment_type": "nit",
+      "evidence": [],
+      "present_pr_impact": false,
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low"
+    },
+    {
+      "comment_id": "demo-c061",
+      "thread_id": "demo-c061",
+      "author": "reviewer-sample-f",
+      "body": "<img src='badge' /> style=flat",
+      "path": "crates/rf-core/src/normalize.rs",
+      "source": "review_comment",
+      "created_at": "2026-05-09T11:05:00Z",
+      "line": 61,
+      "original_line": 61,
+      "comment_type": "unknown",
+      "evidence_class": "noise_only",
+      "evidence": [],
+      "present_pr_impact": false,
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low"
+    },
+    {
+      "comment_id": "demo-c072",
+      "thread_id": "demo-c072",
+      "author": "ci-bot",
+      "body": "Possible mismatch, but the evidence is still broad.",
+      "path": "crates/review-firewall/src/adapter/git.rs",
+      "source": "issue_comment",
+      "created_at": "2026-05-09T11:06:00Z",
+      "comment_type": "blocker",
+      "concern": "api",
+      "failure_mode": "This warning hints at a possible mismatch, but it still needs concrete failure evidence before it should stay residual.",
+      "evidence_class": "keyword_only",
+      "evidence": [
+        "possible mismatch",
+        "needs concrete evidence"
+      ],
+      "present_pr_impact": false,
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low"
+    },
+    {
+      "comment_id": "demo-c083",
+      "thread_id": "demo-c083",
+      "author": "reviewer-sample-g",
+      "body": "This may matter, but I cannot tell what behavior changes from the current wording.",
+      "path": "crates/review-firewall/src/adapter/gh.rs",
+      "source": "issue_comment",
+      "created_at": "2026-05-09T11:07:00Z",
+      "comment_type": "unknown",
+      "evidence": [],
+      "present_pr_impact": false,
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low"
+    },
+    {
+      "comment_id": "demo-r001",
+      "thread_id": "demo-r001",
+      "author": "ai-bot-a",
+      "body": "Report status can hide downstream partial or error artifacts when it is sourced from gate alone.",
+      "path": "crates/review-firewall/src/command/report.rs",
+      "source": "review_comment",
+      "created_at": "2026-05-09T11:08:00Z",
+      "line": 1,
+      "original_line": 1,
+      "comment_type": "blocker",
+      "concern": "api",
+      "failure_mode": "Report status can hide downstream partial or error artifacts when it is sourced from gate alone.",
+      "evidence_class": "contract_delta",
+      "evidence": [
+        "report currently summarizes run completion as one status line",
+        "draft and escalation artifacts can disagree with gate status"
+      ],
+      "present_pr_impact": true,
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low"
+    },
+    {
+      "comment_id": "demo-r003",
+      "thread_id": "demo-r003",
+      "author": "human-reviewer-a",
+      "body": "GitHub metadata fetch failures should degrade data coverage to PARTIAL instead of sounding like fatal review truth.",
+      "path": "crates/review-firewall/src/command/scan.rs",
+      "source": "review_comment",
+      "created_at": "2026-05-09T11:09:00Z",
+      "line": 3,
+      "original_line": 3,
+      "comment_type": "blocker",
+      "concern": "security",
+      "failure_mode": "GitHub metadata fetch failures should degrade data coverage to PARTIAL instead of sounding like fatal review truth.",
+      "evidence_class": "security_condition",
+      "evidence": [
+        "gh metadata fetch can fail independently from local artifact writing",
+        "partial observation must never imply missing review risk"
+      ],
+      "present_pr_impact": true,
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low"
+    },
+    {
+      "comment_id": "demo-r009",
+      "thread_id": "demo-r009",
+      "author": "ai-bot-e",
+      "body": "Synthetic root ids can merge or split threads incorrectly and skew roundtrip counts.",
+      "path": "crates/rf-core/src/normalize.rs",
+      "source": "review_comment",
+      "created_at": "2026-05-09T11:10:00Z",
+      "line": 9,
+      "original_line": 9,
+      "comment_type": "blocker",
+      "concern": "api",
+      "failure_mode": "Synthetic root ids can merge or split threads incorrectly and skew roundtrip counts.",
+      "evidence_class": "concrete_reference",
+      "evidence": [
+        "roundtrip count is used downstream for escalation",
+        "incorrect grouping changes author-facing action routing"
+      ],
+      "present_pr_impact": true,
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low"
+    },
+    {
+      "comment_id": "demo-r011",
+      "thread_id": "demo-r011",
+      "author": "human-reviewer-f",
+      "body": "When GitHub is unavailable, fallback diffing must not assume the local base branch matches the remote PR base.",
+      "path": "crates/review-firewall/src/adapter/git.rs",
+      "source": "review_comment",
+      "created_at": "2026-05-09T11:11:00Z",
+      "line": 11,
+      "original_line": 11,
+      "comment_type": "blocker",
+      "concern": "security",
+      "failure_mode": "When GitHub is unavailable, fallback diffing must not assume the local base branch matches the remote PR base.",
+      "evidence_class": "repro_condition",
+      "evidence": [
+        "fallback diff behavior depends on local branch freshness",
+        "wrong file sets can hide or invent review exposure"
+      ],
+      "present_pr_impact": true,
+      "owner_match": false,
+      "ownership_scope": "none",
+      "advisory_weight": "low"
+    }
+  ]
+}
