@@ -2,16 +2,21 @@ version: 1
 kind: manual_label_corpus_v0_1
 language: en
 sample_target: 50
+human_confirmed: false
 release_usable: false
 release_usable_reason: >
-  This seed scaffold remains below the 50 manually labeled comments release target and does not
-  yet record human-confirmed false_residual_rate or missed_obvious_blocker_rate.
+  This seed scaffold remains below the 50 manually labeled comments release target. Reaching the
+  row-count target alone would still be insufficient until a human-confirmed sample records
+  false_residual_rate and missed_obvious_blocker_rate.
 recorded_metrics:
   false_residual_rate:
   missed_obvious_blocker_rate:
 notes:
   - Seed sample for v0.1 dogfood validation.
   - This corpus is manual and advisory; core gate behavior remains deterministic and code-driven.
+  - human_confirmed means a human has reviewed the checked-in labels and any recorded release metrics for this sample.
+  - Any recorded release metric should be stored as the exact decimal ratio derived from the checked-in sample, not as a rounded percentage.
+  - release_usable must stay false until the checked-in sample is human-confirmed and both release metrics are recorded.
   - Each sampled id should be traceable to the checked-in demo gate artifact.
 source_run:
   demo_path: docs/demos/anonymized-dogfood-run/run/20260509T120800.671751000Z
