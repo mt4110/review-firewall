@@ -364,7 +364,7 @@ fn public_demo_numbers_are_synchronized() {
     assert!(VALIDATION_DOC.contains("missed_obvious_blocker_rate: not yet recorded"));
     assert!(VALIDATION_DOC.contains("reaching 50 rows is necessary but not sufficient"));
     assert!(VALIDATION_DOC.contains("the checked-in sample must be human-confirmed"));
-    assert!(VALIDATION_DOC.contains("exact decimal ratios derived from the checked-in sample"));
+    assert!(VALIDATION_DOC.contains("shortest round-trip IEEE-754 `f64` decimal representation"));
     assert!(DEMO_README.contains("12-row seed sample"));
     assert!(DEFERRED_DOC.contains("12-row traceable scaffold"));
     assert!(DEFERRED_DOC.contains("human-confirmed 50-comment sample"));
@@ -460,9 +460,8 @@ fn derive_missed_obvious_blocker_rate(corpus: &ManualLabelCorpus) -> Option<f64>
 }
 
 fn assert_rate_matches(actual: f64, expected: f64, metric_name: &str) {
-    let delta = (actual - expected).abs();
     assert!(
-        delta < 1e-9,
+        actual.to_bits() == expected.to_bits(),
         "{metric_name} should match the checked-in corpus exactly: actual={actual}, expected={expected}"
     );
 }

@@ -15,7 +15,7 @@ notes:
   - Seed sample for v0.1 dogfood validation.
   - This corpus is manual and advisory; core gate behavior remains deterministic and code-driven.
   - human_confirmed means a human has reviewed the checked-in labels and any recorded release metrics for this sample.
-  - Any recorded release metric should be stored as the exact decimal ratio derived from the checked-in sample, not as a rounded percentage.
+  - Any recorded release metric should be stored as a decimal ratio derived from the checked-in sample, not as a rounded percentage, and encoded with the shortest round-trip IEEE-754 f64 decimal representation.
   - release_usable must stay false until the checked-in sample is human-confirmed and both release metrics are recorded.
   - Each sampled id should be traceable to the checked-in demo gate artifact.
 source_run:

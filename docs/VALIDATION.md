@@ -145,7 +145,7 @@ The checked-in corpus also records top-level scaffold metadata:
 
 `human_confirmed` means a human has reviewed the checked-in labels and the recorded release metrics for this sample.
 It should stay `false` for provisional or partially expanded corpus updates.
-When recorded, `recorded_metrics.*` values should be stored as exact decimal ratios derived from the checked-in sample, not rounded percentages.
+When recorded, `recorded_metrics.*` values should be stored as decimal ratios derived from the checked-in sample, not rounded percentages, and encoded with the shortest round-trip IEEE-754 `f64` decimal representation.
 
 Each labeled row records:
 
