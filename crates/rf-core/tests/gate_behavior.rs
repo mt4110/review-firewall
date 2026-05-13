@@ -168,6 +168,26 @@ fn credential_leak_sentence_is_not_filtered_as_contract_only() {
 }
 
 #[test]
+fn contract_delta_with_array_to_object_survives_filter() {
+    let scan = base_scan(
+        "This can break consumers in this PR because the response changes from array to object.",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let blocker = gate.residual_blockers.first().expect("residual blocker");
+    assert_eq!(blocker.concern, BlockerConcern::Correctness);
+    assert_eq!(blocker.evidence_class, EvidenceClass::ContractDelta);
+    assert!(
+        blocker
+            .evidence
+            .iter()
+            .any(|value| value.contains("array to object")),
+        "concrete contract delta wording should survive the contract-only filter"
+    );
+}
+
+#[test]
 fn unrelated_backtick_reference_does_not_restore_contract_delta() {
     let scan = base_scan(
         "This can break consumers in this PR because the response contract changes around `foo`.",
