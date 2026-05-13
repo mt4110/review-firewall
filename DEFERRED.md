@@ -10,6 +10,6 @@ These items were reviewed during the Phase 6 freeze audit and are intentionally 
 
 ## Human-recorded validation rates
 
-- Current status: the checked-in corpus remains a traceable scaffold and does not yet record the first release-usable `false_residual_rate` or `missed_obvious_blocker_rate`.
+- Current status: the checked-in corpus remains a 12-row traceable scaffold and does not yet record the first release-usable `false_residual_rate` or `missed_obvious_blocker_rate`.
 - Why deferred: these rates are intentionally a human/manual operational step, not something to synthesize from implementation-only validation.
 - Follow-up direction: expand the corpus to a human-labeled 50-comment sample and then record the first release-usable rates in `docs/VALIDATION.md`.
