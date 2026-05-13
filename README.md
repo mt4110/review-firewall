@@ -2,12 +2,13 @@
 
 **Review the review. Protect the author.**
 
-`review-firewall` is a local-first Rust CLI that converts noisy PR discussion into typed, auditable review signals.
+`review-firewall` is an author-side review signal compressor for noisy PR conversations.
+It converts comments that already exist into typed, auditable signals the author can act on without absorbing the full thread.
 
-It does **not** replace code review.
-It does **not** replace CI.
-It does **not** decide architecture for your team.
-It does **not** generate new review comments.
+It does **not** generate AI reviews.
+It does **not** replace human review.
+It does **not** decide merge safety.
+It does **not** post PR comments automatically.
 
 It does one thing:
 
@@ -29,11 +30,41 @@ The author pays first.
 
 ## Positioning
 
-`review-firewall` sits after review comments already exist.
+`review-firewall` sits after review comments already exist, on the author side of the workflow.
 
 It can consume comments from humans, automated review tools, CI summaries, or local review workflows, but it does not create those reviews itself. Its job is to decide what is actually actionable for the author: which comments are evidence-backed blockers, which should become questions or suggestions, and which design debates should leave the PR.
 
 See [Product Boundary](docs/PRODUCT_BOUNDARY.md) for the non-overlap contract.
+
+## Example
+
+One anonymized dogfood run on this repo compressed:
+
+```text
+397 comments analyzed
+45 candidate blockers
+11 residual blockers
+88.66% comments-to-candidate reduction
+97.23% comments-to-residual reduction
+```
+
+That is the product: not more review comments, but less review pressure and clearer next action.
+
+See the checked-in [anonymized dogfood demo](docs/demos/anonymized-dogfood-run/README.md) and the [validation scaffold](docs/VALIDATION.md).
+
+## Not a merge gate
+
+`RUN_STATUS: OK` only means artifact generation completed.
+
+Merge safety is never implied by run status.
+Review state is reported separately as:
+
+```text
+DATA_COVERAGE: FULL | PARTIAL | FAILED
+REVIEW_SIGNAL: BLOCKED | CLEAR | UNKNOWN
+```
+
+If data coverage is partial, the review signal is `UNKNOWN`, not `CLEAR`.
 
 ## Product stance
 
@@ -162,4 +193,5 @@ This repository is intentionally structured for small, agent-assisted changes:
 - Rust/Nix-first contributor workflow
 
 See [Milestones](docs/MILESTONES.md) for the reviewable PR sequence.
+See [Validation](docs/VALIDATION.md) for the v0.1 dogfood metrics scaffold.
 See `README_JA.md` for the Japanese guide.
