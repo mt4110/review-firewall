@@ -960,7 +960,7 @@ fn looks_like_contract_only_claim(text: &str) -> bool {
     contains_contract_surface(text)
         && contains_contract_change_marker(text)
         && !contains_contract_specific_marker(text)
-        && !contains_runtime_specific_marker(text)
+        && !contains_non_contract_impact_marker(text)
 }
 
 fn contains_evidence_marker(text: &str, needles: &[&str]) -> bool {
@@ -1111,15 +1111,17 @@ fn contains_contract_specific_marker(text: &str) -> bool {
     )
 }
 
-fn contains_runtime_specific_marker(text: &str) -> bool {
+fn contains_non_contract_impact_marker(text: &str) -> bool {
     contains_evidence_marker(
         text,
         &[
             "auth",
             "authorization",
+            "credentials",
             "permission",
             "token",
             "secret",
+            "leak",
             "xss",
             "csrf",
             "ssrf",
@@ -1131,9 +1133,16 @@ fn contains_runtime_specific_marker(text: &str) -> bool {
             "timeout",
             "panic",
             "exception",
+            "crash",
             "null",
             "nil",
             "race",
+            "stale",
+            "retry",
+            "latency",
+            "memory",
+            "worker",
+            "rollback",
             "ci",
             "test fails",
             "check failed",
@@ -1254,7 +1263,7 @@ fn looks_like_concrete_reference_fragment(fragment: &str) -> bool {
     ) {
         return true;
     }
-    if normalized.len() >= 4
+    if normalized.len() >= 3
         && fragment
             .chars()
             .all(|character| character.is_ascii_alphabetic())

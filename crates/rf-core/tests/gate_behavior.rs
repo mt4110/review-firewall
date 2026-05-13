@@ -149,6 +149,25 @@ fn auth_runtime_sentence_is_not_filtered_as_contract_only() {
 }
 
 #[test]
+fn credential_leak_sentence_is_not_filtered_as_contract_only() {
+    let scan = base_scan(
+        "This can leak credentials in this PR because the response contract changes for unauthenticated clients.",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let blocker = gate.residual_blockers.first().expect("residual blocker");
+    assert_eq!(blocker.concern, BlockerConcern::Security);
+    assert!(
+        blocker
+            .evidence
+            .iter()
+            .any(|value| value.contains("leak credentials")),
+        "non-contract security impact should survive broad contract filtering"
+    );
+}
+
+#[test]
 fn unrelated_backtick_reference_does_not_restore_contract_delta() {
     let scan = base_scan(
         "This can break consumers in this PR because the response contract changes around `foo`.",
@@ -162,6 +181,21 @@ fn unrelated_backtick_reference_does_not_restore_contract_delta() {
         .expect("classified comment");
     assert!(gate.residual_blockers.is_empty());
     assert_eq!(comment.evidence_class, Some(EvidenceClass::KeywordOnly));
+}
+
+#[test]
+fn short_concrete_backtick_identifier_can_satisfy_evidence_requirement() {
+    let scan = base_scan("This can leak credentials in this PR around `jwt`.");
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let blocker = gate.residual_blockers.first().expect("residual blocker");
+    assert_eq!(blocker.concern, BlockerConcern::Security);
+    assert_eq!(blocker.evidence_class, EvidenceClass::ConcreteReference);
+    assert!(
+        blocker.evidence.iter().any(|value| value.contains("`jwt`")),
+        "short concrete identifiers should still count as backtick evidence"
+    );
 }
 
 #[test]
