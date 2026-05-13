@@ -627,8 +627,7 @@ fn extract_evidence(comment: &CommentRecord, failure_mode: Option<&str>) -> Vec<
         {
             continue;
         }
-        if sentence_supports_evidence(&normalized) && !looks_like_broad_contract_claim(&normalized)
-        {
+        if sentence_supports_evidence(&normalized) && !looks_like_contract_only_claim(&normalized) {
             evidence.push(sentence);
         }
     }
@@ -957,10 +956,11 @@ fn sentence_supports_evidence(text: &str) -> bool {
     )
 }
 
-fn looks_like_broad_contract_claim(text: &str) -> bool {
+fn looks_like_contract_only_claim(text: &str) -> bool {
     contains_contract_surface(text)
         && contains_contract_change_marker(text)
         && !contains_contract_specific_marker(text)
+        && !contains_runtime_specific_marker(text)
 }
 
 fn contains_evidence_marker(text: &str, needles: &[&str]) -> bool {
@@ -1111,6 +1111,40 @@ fn contains_contract_specific_marker(text: &str) -> bool {
     )
 }
 
+fn contains_runtime_specific_marker(text: &str) -> bool {
+    contains_evidence_marker(
+        text,
+        &[
+            "auth",
+            "authorization",
+            "permission",
+            "token",
+            "secret",
+            "xss",
+            "csrf",
+            "ssrf",
+            "sql injection",
+            "path traversal",
+            "open redirect",
+            "500",
+            "503",
+            "timeout",
+            "panic",
+            "exception",
+            "null",
+            "nil",
+            "race",
+            "ci",
+            "test fails",
+            "check failed",
+            "status=",
+            "理由:",
+            "根拠",
+            "証拠",
+        ],
+    )
+}
+
 fn contains_any(text: &str, needles: &[&str]) -> bool {
     needles.iter().any(|needle| text.contains(needle))
 }
@@ -1170,7 +1204,21 @@ fn looks_like_concrete_reference_fragment(fragment: &str) -> bool {
     }
     if matches!(
         normalized.as_str(),
-        "foo" | "bar" | "baz" | "qux" | "dummy" | "example value" | "placeholder"
+        "foo"
+            | "bar"
+            | "baz"
+            | "qux"
+            | "dummy"
+            | "example value"
+            | "placeholder"
+            | "todo"
+            | "fixme"
+            | "note"
+            | "notes"
+            | "test"
+            | "tests"
+            | "tmp"
+            | "temp"
     ) {
         return false;
     }

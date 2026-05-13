@@ -129,6 +129,26 @@ fn broad_contract_wording_without_specific_delta_becomes_keyword_only() {
 }
 
 #[test]
+fn auth_runtime_sentence_is_not_filtered_as_contract_only() {
+    let scan = base_scan(
+        "This can leak the auth token in this PR because when this request returns 500, clients retry with the same secret.",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let blocker = gate.residual_blockers.first().expect("residual blocker");
+    assert_eq!(blocker.concern, BlockerConcern::Security);
+    assert_eq!(blocker.evidence_class, EvidenceClass::SecurityCondition);
+    assert!(
+        blocker
+            .evidence
+            .iter()
+            .any(|value| value.contains("auth token")),
+        "runtime-specific evidence should survive broad contract filtering"
+    );
+}
+
+#[test]
 fn unrelated_backtick_reference_does_not_restore_contract_delta() {
     let scan = base_scan(
         "This can break consumers in this PR because the response contract changes around `foo`.",
@@ -141,6 +161,23 @@ fn unrelated_backtick_reference_does_not_restore_contract_delta() {
         .first()
         .expect("classified comment");
     assert!(gate.residual_blockers.is_empty());
+    assert_eq!(comment.evidence_class, Some(EvidenceClass::KeywordOnly));
+}
+
+#[test]
+fn placeholder_backtick_reference_does_not_satisfy_evidence_requirement() {
+    let scan = base_scan(
+        "This can break consumers in this PR because the response contract changes around `TODO`.",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert!(gate.residual_blockers.is_empty());
+    assert!(comment.evidence.is_empty());
     assert_eq!(comment.evidence_class, Some(EvidenceClass::KeywordOnly));
 }
 
