@@ -12,8 +12,26 @@ It does ship a small, reviewable validation scaffold so trust claims live in the
 The checked-in demo mirrors the current artifact contract and keeps the full 45-entry `candidate_blockers` list so `397 -> 45 -> 11` is reproducible from the repo.
 It still trims heavy fields such as the full comment list and the full review-thread list.
 For manual validation, sampled non-residual rows are traceable through the checked-in `gate.json.classified_comments` slice.
-The checked-in corpus is still a seed scaffold, not the full 50-comment release sample.
+The checked-in corpus is currently a 12-row seed scaffold, not the full 50-comment release sample.
+Its checked-in metadata intentionally stays at `release_usable: false` with both human-recorded rates left unset.
 It is enough to prove traceability and schema shape, but not enough to publish the first release-usable human validation rates yet.
+
+## Current scaffold status
+
+```text
+sampled_rows: 12
+target_release_sample: 50
+release_usable: false
+false_residual_rate: not yet recorded
+missed_obvious_blocker_rate: not yet recorded
+```
+
+Next operator step:
+
+- expand the checked-in corpus by at least 38 more human-labeled comments
+- keep every new row traceable to the checked-in dogfood demo artifacts
+- record the first release-usable `false_residual_rate` and `missed_obvious_blocker_rate`
+- flip the corpus metadata to `release_usable: true` only after those rates are actually recorded
 
 ## Metrics
 
@@ -108,6 +126,14 @@ The checked-in demo should not surface badge/html fragments in `failure_mode` or
 ## Corpus shape
 
 The v0.1 scaffold intentionally stays manual and file-based.
+The checked-in corpus also records top-level scaffold metadata:
+
+- `sample_target`
+- `release_usable`
+- `release_usable_reason`
+- `recorded_metrics.false_residual_rate`
+- `recorded_metrics.missed_obvious_blocker_rate`
+
 Each labeled row records:
 
 - `comment_id`
@@ -137,7 +163,7 @@ Allowed `manual_label` values:
 
 ## What is still manual
 
-- Expanding the checked-in corpus to a human-labeled 50-comment release sample
+- Expanding the checked-in corpus from 12 rows to a human-labeled 50-comment release sample
 - Recording the first release-usable `false_residual_rate` from that human sample
 - Recording the first release-usable `missed_obvious_blocker_rate` from that human sample
 

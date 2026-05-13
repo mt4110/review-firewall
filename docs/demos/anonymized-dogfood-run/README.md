@@ -31,3 +31,4 @@ Summary metrics for this run:
 
 To keep the demo compact, the checked-in artifacts omit the full comment list and full review-thread list.
 They keep the full 45-entry `candidate_blockers` array plus a sampled `classified_comments` slice so the published `397 -> 45 -> 11` demo and the manual-label scaffold stay auditable from the repo.
+That manual-label scaffold is currently a 12-row seed sample, not the full 50-comment release-validation corpus.

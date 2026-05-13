@@ -30,7 +30,9 @@ const MANUAL_LABEL_CORPUS: &str =
 const README_EN: &str = include_str!("../../../README.md");
 const README_JA: &str = include_str!("../../../README_JA.md");
 const VALIDATION_DOC: &str = include_str!("../../../docs/VALIDATION.md");
+const DEFERRED_DOC: &str = include_str!("../../../DEFERRED.md");
 const DEMO_README: &str = include_str!("../../../docs/demos/anonymized-dogfood-run/README.md");
+const FREEZE_AUDIT_DOC: &str = include_str!("../../../docs/v0.1-freeze-audit.md");
 const SCAN_SCHEMA: &str = include_str!("../../../schemas/scan.schema.json");
 const GATE_SCHEMA: &str = include_str!("../../../schemas/gate.schema.json");
 
@@ -39,10 +41,20 @@ struct ManualLabelCorpus {
     version: u64,
     kind: String,
     language: String,
+    sample_target: usize,
+    release_usable: bool,
+    release_usable_reason: String,
+    recorded_metrics: RecordedMetrics,
     #[serde(default)]
     notes: Vec<String>,
     source_run: SourceRun,
     cases: Vec<ManualLabelCase>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct RecordedMetrics {
+    false_residual_rate: Option<f64>,
+    missed_obvious_blocker_rate: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -156,7 +168,12 @@ fn manual_label_corpus_scaffold_is_well_formed() {
     assert_eq!(corpus.version, 1);
     assert!(corpus.kind.contains("manual_label"));
     assert_eq!(corpus.language, "en");
+    assert_eq!(corpus.sample_target, 50);
     assert!(!corpus.notes.is_empty());
+    assert!(
+        !corpus.release_usable_reason.trim().is_empty(),
+        "release_usable_reason should explain why the corpus is or is not ready"
+    );
 
     assert_eq!(
         corpus.source_run.demo_path,
@@ -234,6 +251,27 @@ fn manual_label_corpus_scaffold_is_well_formed() {
 }
 
 #[test]
+fn checked_in_manual_label_corpus_matches_current_scaffold_state() {
+    let corpus: ManualLabelCorpus =
+        serde_yaml::from_str(MANUAL_LABEL_CORPUS).expect("manual label corpus");
+
+    assert_eq!(corpus.cases.len(), 12);
+    assert!(!corpus.release_usable);
+    assert_eq!(corpus.sample_target, 50);
+    assert!(
+        corpus.recorded_metrics.false_residual_rate.is_none(),
+        "current checked-in scaffold should not claim a recorded false_residual_rate yet"
+    );
+    assert!(
+        corpus
+            .recorded_metrics
+            .missed_obvious_blocker_rate
+            .is_none(),
+        "current checked-in scaffold should not claim a recorded missed_obvious_blocker_rate yet"
+    );
+}
+
+#[test]
 fn public_demo_numbers_are_synchronized() {
     for document in [README_EN, README_JA, DEMO_README] {
         assert!(document.contains("397 comments analyzed"));
@@ -244,8 +282,24 @@ fn public_demo_numbers_are_synchronized() {
     assert!(VALIDATION_DOC.contains("comments_analyzed: 397"));
     assert!(VALIDATION_DOC.contains("candidate_blockers: 45"));
     assert!(VALIDATION_DOC.contains("residual_blockers: 11"));
-    assert!(VALIDATION_DOC.contains("seed scaffold"));
-    assert!(VALIDATION_DOC.contains("50-comment release sample"));
+    assert!(VALIDATION_DOC.contains("12-row seed scaffold"));
+    assert!(VALIDATION_DOC.contains("sampled_rows: 12"));
+    assert!(VALIDATION_DOC.contains("target_release_sample: 50"));
+    assert!(VALIDATION_DOC.contains("release_usable: false"));
+    assert!(VALIDATION_DOC.contains("release_usable_reason"));
+    assert!(VALIDATION_DOC.contains("false_residual_rate: not yet recorded"));
+    assert!(VALIDATION_DOC.contains("missed_obvious_blocker_rate: not yet recorded"));
+    assert!(DEMO_README.contains("12-row seed sample"));
+    assert!(DEFERRED_DOC.contains("12-row traceable scaffold"));
+    assert!(DEFERRED_DOC.contains("50-comment sample"));
+    assert!(
+        !FREEZE_AUDIT_DOC
+            .contains("First-class downstream `reviewDecision` behavior is explicitly deferred.")
+    );
+    assert!(
+        FREEZE_AUDIT_DOC
+            .contains("Review-decision handling now ships as informational downstream context")
+    );
 }
 
 #[test]
