@@ -129,7 +129,7 @@ Recommended additional fields:
 - `partial_sources`
 - `scan_partial` as a compatibility flag
 
-`scan.json.pr.review_decisions` carries the current top-level GitHub review state when available, with review-history states used only as a fallback when that top-level field is absent.
+`scan.json.pr.review_decisions` carries the current top-level GitHub review state when available, with the latest effective state derived from review history used only as a fallback when that top-level field is absent.
 It is downstream-visible, but it remains informational input rather than blocker evidence.
 
 `product_boundary` records the product-category contract for auditability:
