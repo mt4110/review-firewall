@@ -90,6 +90,26 @@ pub fn build_draft_reply(gate: &GateArtifact, max_lines: usize) -> DraftReplyArt
         };
     }
 
+    if gate.review_signal == crate::domain::ReviewSignal::Clear
+        && gate
+            .review_decision_summary
+            .as_ref()
+            .is_some_and(|summary| summary.changes_requested)
+    {
+        return DraftReplyArtifact {
+            status: gate.status,
+            data_coverage: gate.data_coverage,
+            review_signal: gate.review_signal,
+            reason: gate.reason.clone(),
+            reply_type: ReplyType::AskForEvidence,
+            target_comment_id: None,
+            body: limit_lines(
+                "Thanks. I do not see a concrete PR-local blocker in the current diff yet.\nCould you point me to the specific failure mode, repro condition, or contract delta that should keep this review in changes requested?",
+                max_lines,
+            ),
+        };
+    }
+
     DraftReplyArtifact {
         status: gate.status,
         data_coverage: gate.data_coverage,

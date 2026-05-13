@@ -663,6 +663,84 @@ fn scan_normalization_drops_empty_review_decisions() {
 }
 
 #[test]
+fn scan_normalization_prefers_current_review_decision_over_review_history() {
+    let pr_value = serde_json::json!({
+        "number": 144,
+        "title": "Current state wins",
+        "reviewDecision": "APPROVED",
+        "reviews": [
+            { "state": "CHANGES_REQUESTED" },
+            { "state": "COMMENTED" }
+        ]
+    });
+
+    let pr = command::scan::build_pull_request_summary_for_tests(&pr_value);
+
+    assert_eq!(pr.review_decisions, vec![String::from("APPROVED")]);
+}
+
+#[test]
+fn scan_normalization_falls_back_to_review_history_when_top_level_state_is_missing() {
+    let pr_value = serde_json::json!({
+        "number": 145,
+        "title": "Fallback state",
+        "reviews": [
+            { "state": "CHANGES_REQUESTED" },
+            { "state": "CHANGES_REQUESTED" },
+            { "state": "COMMENTED" }
+        ]
+    });
+
+    let pr = command::scan::build_pull_request_summary_for_tests(&pr_value);
+
+    assert_eq!(pr.review_decisions, vec![String::from("CHANGES_REQUESTED")]);
+}
+
+#[test]
+fn scan_normalization_fallback_prefers_latest_decisive_state_over_stale_history() {
+    let pr_value = serde_json::json!({
+        "number": 146,
+        "title": "Fallback latest state",
+        "reviews": [
+            {
+                "state": "CHANGES_REQUESTED",
+                "submittedAt": "2026-03-28T00:00:00Z"
+            },
+            {
+                "state": "APPROVED",
+                "submittedAt": "2026-03-28T00:01:00Z"
+            },
+            {
+                "state": "COMMENTED",
+                "submittedAt": "2026-03-28T00:02:00Z"
+            }
+        ]
+    });
+
+    let pr = command::scan::build_pull_request_summary_for_tests(&pr_value);
+
+    assert_eq!(pr.review_decisions, vec![String::from("APPROVED")]);
+}
+
+#[test]
+fn scan_normalization_fallback_uses_commented_when_no_decisive_state_exists() {
+    let pr_value = serde_json::json!({
+        "number": 147,
+        "title": "Fallback commented state",
+        "reviews": [
+            {
+                "state": "COMMENTED",
+                "submittedAt": "2026-03-28T00:02:00Z"
+            }
+        ]
+    });
+
+    let pr = command::scan::build_pull_request_summary_for_tests(&pr_value);
+
+    assert_eq!(pr.review_decisions, vec![String::from("COMMENTED")]);
+}
+
+#[test]
 fn scan_normalization_captures_review_body_comments() {
     let pr_value = serde_json::json!({
         "reviews": [

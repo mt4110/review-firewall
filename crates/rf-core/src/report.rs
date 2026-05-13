@@ -30,6 +30,12 @@ pub fn build_report_markdown(
     {
         lines.push(format!("REASON: {reason}"));
     }
+    if let Some(summary) = gate.and_then(|artifact| artifact.review_decision_summary.as_ref()) {
+        lines.push(format!(
+            "REVIEW_DECISIONS: {} (informational only)",
+            summary.states.join(", ")
+        ));
+    }
     lines.push(String::new());
     lines.push(String::from("# Review Firewall Report"));
     lines.push(String::new());
@@ -55,6 +61,12 @@ pub fn build_report_markdown(
     lines.push(String::new());
     lines.push(String::from("## PM summary"));
     lines.push(format!("Residual blockers: {}", header.residual_blockers));
+    if let Some(summary) = gate.and_then(|artifact| artifact.review_decision_summary.as_ref()) {
+        lines.push(format!(
+            "Reviewer state: {} (informational only)",
+            summary.states.join(", ")
+        ));
+    }
     if let Some(first_blocker) = gate.and_then(|artifact| artifact.residual_blockers.first()) {
         lines.push(format!("Impact: {}", first_blocker.failure_mode));
         lines.push(String::from(
@@ -70,6 +82,16 @@ pub fn build_report_markdown(
             ));
             lines.push(String::from(
                 "Action: resolve missing analysis inputs before making a merge decision",
+            ));
+        } else if gate
+            .and_then(|artifact| artifact.review_decision_summary.as_ref())
+            .is_some_and(|summary| summary.changes_requested)
+        {
+            lines.push(String::from(
+                "Impact: no residual blocker was extracted, but GitHub still shows changes requested.",
+            ));
+            lines.push(String::from(
+                "Action: align the remaining review state with a concrete PR-local blocker or clear the stale request",
             ));
         } else {
             lines.push(String::from(
@@ -100,6 +122,16 @@ pub fn build_report_markdown(
             "{action_index}. Use the {} reply draft: {}",
             reply_label(&draft_reply.reply_type),
             draft_reply.body.replace('\n', " / ")
+        ));
+        action_index += 1;
+    }
+    if header.review_signal == ReviewSignal::Clear
+        && gate
+            .and_then(|artifact| artifact.review_decision_summary.as_ref())
+            .is_some_and(|summary| summary.changes_requested)
+    {
+        lines.push(format!(
+            "{action_index}. Align the remaining CHANGES_REQUESTED state with a concrete PR-local blocker or dismiss it as stale"
         ));
         action_index += 1;
     }

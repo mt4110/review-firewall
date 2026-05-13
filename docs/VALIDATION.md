@@ -12,6 +12,8 @@ It does ship a small, reviewable validation scaffold so trust claims live in the
 The checked-in demo mirrors the current artifact contract and keeps the full 45-entry `candidate_blockers` list so `397 -> 45 -> 11` is reproducible from the repo.
 It still trims heavy fields such as the full comment list and the full review-thread list.
 For manual validation, sampled non-residual rows are traceable through the checked-in `gate.json.classified_comments` slice.
+The checked-in corpus is still a seed scaffold, not the full 50-comment release sample.
+It is enough to prove traceability and schema shape, but not enough to publish the first release-usable human validation rates yet.
 
 ## Metrics
 
@@ -135,9 +137,9 @@ Allowed `manual_label` values:
 
 ## What is still manual
 
-- Sampling the next 50 comments from dogfood runs
-- Recording the first release-usable `false_residual_rate`
-- Recording the first release-usable `missed_obvious_blocker_rate`
+- Expanding the checked-in corpus to a human-labeled 50-comment release sample
+- Recording the first release-usable `false_residual_rate` from that human sample
+- Recording the first release-usable `missed_obvious_blocker_rate` from that human sample
 
 That is deliberate for v0.1.
 The product stays a local deterministic triage CLI, while the trust claim gets a concrete place to live in-repo.

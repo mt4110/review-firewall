@@ -81,6 +81,7 @@ fn gate_artifact_serializes_minimum_shape() {
         duplicates_collapsed: Vec::new(),
         warnings: Vec::new(),
         config_snapshot: GateConfigSnapshot::default(),
+        review_decision_summary: None,
         classified_comments: Vec::new(),
         escalation_candidates: Vec::new(),
     };

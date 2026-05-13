@@ -67,6 +67,7 @@ REVIEW_SIGNAL: BLOCKED | CLEAR | UNKNOWN
 ```
 
 データが partial なら、review signal は `CLEAR` ではなく `UNKNOWN` です。
+GitHub の review decision は別途 informational な reviewer-state として見せますが、`REVIEW_SIGNAL` を上書きしたり、それ単体で blocker を作ったりはしません。
 
 ## プロダクトの立場
 

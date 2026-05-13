@@ -56,6 +56,12 @@ fn command_outcome(artifact: &mut GateArtifact) -> CommandOutcome {
         format!("Nits: {}", artifact.counts.nits),
         format!("Praise: {}", artifact.counts.praise),
     ];
+    if let Some(summary) = artifact.review_decision_summary.as_ref() {
+        lines.push(format!(
+            "Review state: {} (informational only)",
+            summary.states.join(", ")
+        ));
+    }
     if let Some(top) = artifact.residual_blockers.first() {
         lines.push(format!(
             "Top blocker: [{}] {} ({})",
@@ -75,6 +81,15 @@ fn command_outcome(artifact: &mut GateArtifact) -> CommandOutcome {
         next: if artifact.review_signal == ReviewSignal::Unknown {
             Some(String::from(
                 "Resolve missing review inputs before treating this PR as clear.",
+            ))
+        } else if artifact.review_signal == ReviewSignal::Clear
+            && artifact
+                .review_decision_summary
+                .as_ref()
+                .is_some_and(|summary| summary.changes_requested)
+        {
+            Some(String::from(
+                "No residual blocker was extracted, but GitHub still shows changes requested; align it with concrete PR-local evidence or clear the stale review state.",
             ))
         } else {
             None
@@ -100,6 +115,7 @@ fn error_gate_artifact(reason: impl Into<String>) -> GateArtifact {
         duplicates_collapsed: Vec::new(),
         warnings: Vec::new(),
         config_snapshot: Default::default(),
+        review_decision_summary: None,
         classified_comments: Vec::new(),
         escalation_candidates: Vec::new(),
     }

@@ -65,6 +65,7 @@ REVIEW_SIGNAL: BLOCKED | CLEAR | UNKNOWN
 ```
 
 If data coverage is partial, the review signal is `UNKNOWN`, not `CLEAR`.
+GitHub review-decision state is surfaced separately as informational reviewer state; it never overrides `REVIEW_SIGNAL` or creates blockers on its own.
 
 ## Product stance
 

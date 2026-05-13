@@ -269,11 +269,13 @@ Compute:
 - evidence classes
 - ownership advisory
 - aggregate counts
+- informational review-decision summary
 
 The PR author's own comments may still be classified for context, but they are not extracted as residual blockers.
 Diff-local context by itself is never enough for `present_pr_impact=true`; the comment must include a concrete failure mode.
 Residual blockers must never be emitted from `path_only` or `noise_only`.
 `keyword_only` is only allowed as a residual blocker when `require_evidence=false`; when `require_evidence=true`, residual blockers require concrete evidence.
+Top-level GitHub review-decision state is downstream-visible, but informational only: it can shape author follow-up, yet it must never override `review_signal` or create residual blockers by itself.
 
 Output:
 
@@ -286,12 +288,14 @@ Output:
 - `data_coverage`
 - `review_signal`
 - evidence-backed residual blockers
+- informational `review_decision_summary` when scan observed review state
 
 ### `draft-reply`
 
 Generate concise author replies.
 If local config is partial, the command status and reason reflect that instead of silently using defaults.
 If the gate artifact is missing, unreadable, `PARTIAL`, or `ERROR`, the command writes non-authoritative draft artifacts that explain analysis could not complete and avoids making a merge-safety judgment.
+If GitHub still shows `CHANGES_REQUESTED` but no residual blocker was extracted, the draft should prefer asking for concrete PR-local evidence over implying the PR is safe.
 
 Reply modes are intentionally narrow:
 
@@ -322,6 +326,7 @@ Output:
 Produce final engineer + PM + author outputs.
 The report command merges status from scan, gate, draft-reply, and escalation artifacts so final output cannot hide a partial downstream command.
 The report header must expose run status, data coverage, review signal, and residual blocker count before the human summary.
+When present, top-level review-decision state should also be surfaced as informational reviewer state, not as blocker evidence.
 
 Output:
 
@@ -336,6 +341,7 @@ The following are **not enough by themselves**:
 - comment exists on a changed line
 - changed file path mentions a risky subsystem
 - reviewer sounds confident
+- broad contract wording without a concrete delta, repro, or reference
 
 Evidence should come from at least one of:
 

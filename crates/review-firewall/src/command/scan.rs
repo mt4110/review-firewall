@@ -374,28 +374,12 @@ pub fn parse_pr_url_repository_identity_for_tests(url: &str) -> Option<git::Repo
 }
 
 fn build_pull_request_summary(value: &Value) -> PullRequestSummary {
-    let mut review_decisions = value
+    let review_decisions = value
         .get("reviewDecision")
         .and_then(Value::as_str)
         .filter(|decision| !decision.trim().is_empty())
         .map(|decision| vec![decision.to_owned()])
-        .unwrap_or_default();
-
-    for review_state in value
-        .get("reviews")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(|review| review.get("state").and_then(Value::as_str))
-        .filter(|state| !state.trim().is_empty())
-    {
-        if !review_decisions
-            .iter()
-            .any(|existing| existing == review_state)
-        {
-            review_decisions.push(review_state.to_owned());
-        }
-    }
+        .unwrap_or_else(|| fallback_review_decisions(value));
 
     PullRequestSummary {
         number: value.get("number").and_then(Value::as_u64),
@@ -441,6 +425,51 @@ fn build_pull_request_summary(value: &Value) -> PullRequestSummary {
             .and_then(Value::as_str)
             .map(ToOwned::to_owned),
     }
+}
+
+fn fallback_review_decisions(value: &Value) -> Vec<String> {
+    let Some(reviews) = value.get("reviews").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+
+    let mut ordered_reviews = reviews
+        .iter()
+        .enumerate()
+        .filter_map(|(index, review)| {
+            let state = review.get("state").and_then(Value::as_str)?.trim();
+            if state.is_empty() {
+                return None;
+            }
+            Some((
+                review
+                    .get("submittedAt")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                index,
+                state.to_owned(),
+            ))
+        })
+        .collect::<Vec<_>>();
+
+    ordered_reviews.sort_by(|left, right| left.0.cmp(&right.0).then(left.1.cmp(&right.1)));
+
+    let mut last_decisive_state = None::<String>;
+    let mut last_commented_state = None::<String>;
+
+    for (_, _, state) in ordered_reviews {
+        match state.as_str() {
+            "APPROVED" | "CHANGES_REQUESTED" => last_decisive_state = Some(state),
+            "DISMISSED" => last_decisive_state = None,
+            "COMMENTED" => last_commented_state = Some(state),
+            _ => last_decisive_state = Some(state),
+        }
+    }
+
+    last_decisive_state
+        .or(last_commented_state)
+        .into_iter()
+        .collect()
 }
 
 #[cfg(test)]

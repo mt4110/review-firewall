@@ -2,8 +2,8 @@ use rf_core::build_draft_reply;
 use rf_core::domain::{
     AdvisoryWeight, BlockerConcern, ClassifiedComment, CommentRecord, CommentSource, CommentType,
     DataCoverage, DraftReplyArtifact, EscalationCandidate, EscalationLabel, EvidenceClass,
-    GateArtifact, GateConfigSnapshot, GateCounts, ReplyType, ResidualBlocker, ReviewSignal,
-    ScanArtifact, Status,
+    GateArtifact, GateConfigSnapshot, GateCounts, ReplyType, ResidualBlocker,
+    ReviewDecisionSummary, ReviewSignal, ScanArtifact, Status,
 };
 use rf_core::{ReportHeader, build_report_markdown};
 
@@ -35,6 +35,7 @@ fn draft_reply_respects_max_lines() {
         duplicates_collapsed: Vec::new(),
         warnings: Vec::new(),
         config_snapshot: GateConfigSnapshot::default(),
+        review_decision_summary: None,
         classified_comments: Vec::new(),
         escalation_candidates: Vec::new(),
     };
@@ -95,6 +96,7 @@ fn draft_reply_prefers_escalation_before_asking_for_evidence() {
         duplicates_collapsed: Vec::new(),
         warnings: Vec::new(),
         config_snapshot: GateConfigSnapshot::default(),
+        review_decision_summary: None,
         classified_comments: vec![weak_evidence_comment()],
         escalation_candidates: vec![escalation_candidate(EscalationLabel::MoveToAdr)],
     };
@@ -121,6 +123,19 @@ fn draft_reply_preserves_rfc_and_human_judgment_routes() {
     let human_draft = build_draft_reply(&human_gate, 3);
     assert_eq!(human_draft.reply_type, ReplyType::NeedsHumanJudgment);
     assert!(human_draft.body.contains("human judgment call"));
+}
+
+#[test]
+fn draft_reply_asks_for_evidence_when_changes_requested_has_no_residual_blocker() {
+    let mut gate = empty_gate();
+    gate.review_decision_summary =
+        ReviewDecisionSummary::from_states(&[String::from("CHANGES_REQUESTED")]);
+
+    let draft = build_draft_reply(&gate, 3);
+
+    assert_eq!(draft.reply_type, ReplyType::AskForEvidence);
+    assert!(draft.target_comment_id.is_none());
+    assert!(draft.body.contains("changes requested"));
 }
 
 #[test]
@@ -151,6 +166,7 @@ fn report_contains_required_sections() {
         duplicates_collapsed: Vec::new(),
         warnings: Vec::new(),
         config_snapshot: GateConfigSnapshot::default(),
+        review_decision_summary: None,
         classified_comments: Vec::new(),
         escalation_candidates: Vec::new(),
     };
@@ -252,6 +268,31 @@ fn report_avoids_no_blocker_claim_when_analysis_is_partial() {
     assert!(!report.contains("continue normal PR follow-up"));
 }
 
+#[test]
+fn report_surfaces_changes_requested_as_informational_context() {
+    let mut gate = empty_gate();
+    gate.review_decision_summary =
+        ReviewDecisionSummary::from_states(&[String::from("CHANGES_REQUESTED")]);
+
+    let report = build_report_markdown(
+        ReportHeader {
+            run_status: Status::Ok,
+            data_coverage: DataCoverage::Full,
+            review_signal: ReviewSignal::Clear,
+            residual_blockers: 0,
+        },
+        None,
+        None,
+        Some(&gate),
+        None,
+        Some("# Escalation\n\nNo ADR/RFC candidates were found."),
+    );
+
+    assert!(report.contains("REVIEW_DECISIONS: CHANGES_REQUESTED (informational only)"));
+    assert!(report.contains("GitHub still shows changes requested"));
+    assert!(report.contains("Align the remaining CHANGES_REQUESTED state"));
+}
+
 fn non_authoritative_gate(status: Status, reason: &str) -> GateArtifact {
     GateArtifact {
         status,
@@ -266,6 +307,7 @@ fn non_authoritative_gate(status: Status, reason: &str) -> GateArtifact {
         duplicates_collapsed: Vec::new(),
         warnings: Vec::new(),
         config_snapshot: GateConfigSnapshot::default(),
+        review_decision_summary: None,
         classified_comments: Vec::new(),
         escalation_candidates: Vec::new(),
     }
@@ -285,6 +327,7 @@ fn empty_gate() -> GateArtifact {
         duplicates_collapsed: Vec::new(),
         warnings: Vec::new(),
         config_snapshot: GateConfigSnapshot::default(),
+        review_decision_summary: None,
         classified_comments: Vec::new(),
         escalation_candidates: Vec::new(),
     }
