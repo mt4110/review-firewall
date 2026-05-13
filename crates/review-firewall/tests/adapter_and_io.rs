@@ -663,6 +663,43 @@ fn scan_normalization_drops_empty_review_decisions() {
 }
 
 #[test]
+fn scan_normalization_prefers_current_review_decision_over_review_history() {
+    let pr_value = serde_json::json!({
+        "number": 144,
+        "title": "Current state wins",
+        "reviewDecision": "APPROVED",
+        "reviews": [
+            { "state": "CHANGES_REQUESTED" },
+            { "state": "COMMENTED" }
+        ]
+    });
+
+    let pr = command::scan::build_pull_request_summary_for_tests(&pr_value);
+
+    assert_eq!(pr.review_decisions, vec![String::from("APPROVED")]);
+}
+
+#[test]
+fn scan_normalization_falls_back_to_review_history_when_top_level_state_is_missing() {
+    let pr_value = serde_json::json!({
+        "number": 145,
+        "title": "Fallback state",
+        "reviews": [
+            { "state": "CHANGES_REQUESTED" },
+            { "state": "CHANGES_REQUESTED" },
+            { "state": "COMMENTED" }
+        ]
+    });
+
+    let pr = command::scan::build_pull_request_summary_for_tests(&pr_value);
+
+    assert_eq!(
+        pr.review_decisions,
+        vec![String::from("CHANGES_REQUESTED"), String::from("COMMENTED")]
+    );
+}
+
+#[test]
 fn scan_normalization_captures_review_body_comments() {
     let pr_value = serde_json::json!({
         "reviews": [

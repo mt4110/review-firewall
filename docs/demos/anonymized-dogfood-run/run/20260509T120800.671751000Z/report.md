@@ -3,6 +3,7 @@ DATA_COVERAGE: FULL
 REVIEW_SIGNAL: BLOCKED
 RESIDUAL_BLOCKERS: 11
 STATUS: OK
+REVIEW_DECISIONS: COMMENTED (informational only)
 
 # Review Firewall Report
 
@@ -21,6 +22,7 @@ STATUS: OK
 
 ## PM summary
 Residual blockers: 11
+Reviewer state: COMMENTED (informational only)
 Impact: Report status can hide downstream partial or error artifacts when it is sourced from gate alone.
 Action: decide whether to fix in this PR or move the broader design issue out of band
 

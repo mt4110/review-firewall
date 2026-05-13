@@ -129,6 +129,9 @@ Recommended additional fields:
 - `partial_sources`
 - `scan_partial` as a compatibility flag
 
+`scan.json.pr.review_decisions` carries the current top-level GitHub review state when available, with review-history states used only as a fallback when that top-level field is absent.
+It is downstream-visible, but it remains informational input rather than blocker evidence.
+
 `product_boundary` records the product-category contract for auditability:
 
 ```json
@@ -181,6 +184,21 @@ Recommended additional fields:
 - `config_snapshot`
 - `classified_comments`
 - `escalation_candidates`
+- `review_decision_summary`
+
+When present, `review_decision_summary` should look like:
+
+```json
+{
+  "states": ["CHANGES_REQUESTED"],
+  "changes_requested": true,
+  "approved": false,
+  "review_required": false,
+  "informational_only": true
+}
+```
+
+This summary is first-class reviewer-state context for the author, but it must never override `review_signal` or create residual blockers on its own.
 
 ## `draft_reply.json`
 
@@ -258,6 +276,8 @@ Must include three sections:
 1. residual blockers
 2. PM summary
 3. author action list
+
+When top-level review-decision state is available, `report.md` may also surface it as informational reviewer state.
 
 Suggested shape:
 

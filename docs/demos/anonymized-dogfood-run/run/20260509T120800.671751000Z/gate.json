@@ -842,6 +842,15 @@
     "max_pr_thread_roundtrips": 2,
     "use_codeowners": true
   },
+  "review_decision_summary": {
+    "states": [
+      "COMMENTED"
+    ],
+    "changes_requested": false,
+    "approved": false,
+    "review_required": false,
+    "informational_only": true
+  },
   "classified_comments": [
     {
       "comment_id": "demo-c014",

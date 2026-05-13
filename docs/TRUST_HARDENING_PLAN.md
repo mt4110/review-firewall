@@ -92,6 +92,16 @@ Residual blockers must never be emitted from:
 
 `keyword_only` is only allowed as a residual blocker when `require_evidence = false`.
 When `require_evidence = true`, `keyword_only` must also be rejected as non-authoritative blocker evidence.
+Broad contract wording without a concrete delta or reference should also fall back to non-authoritative evidence.
+
+### 3.5 Review-decision visibility
+
+Surface top-level GitHub review-decision state downstream as author-facing context.
+It is first-class reviewer state, but informational only:
+
+- it may shape report and draft-reply follow-up
+- it must never override `review_signal`
+- it must never create a residual blocker on its own
 
 ### 4. Draft reply safety
 

@@ -8,7 +8,7 @@ pub mod status;
 
 pub use artifact::{
     DraftReplyArtifact, GateArtifact, GateConfigSnapshot, LatestPointer, ProductBoundarySnapshot,
-    PullRequestSummary, ScanArtifact,
+    PullRequestSummary, ReviewDecisionSummary, ScanArtifact,
 };
 pub use blocker::{DuplicateGroup, EvidenceClass, GateCounts, ResidualBlocker};
 pub use comment::{

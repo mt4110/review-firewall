@@ -42,8 +42,7 @@ Included:
 
 Deferred:
 
-- stricter evidence extraction
-- first-class downstream use of top-level `reviewDecision`
+- human-recorded release metrics from the manual validation corpus
 
 ## M1.5: v0.1 Trust Hardening
 

@@ -92,8 +92,9 @@ fn pr_scope_markers_require_word_boundaries() {
 
 #[test]
 fn failure_mode_and_evidence_detection_is_case_insensitive() {
-    let scan =
-        base_scan("This PR can Break consumers Because response contract changes in this PR.");
+    let scan = base_scan(
+        "This PR can Break consumers Because status=partial changes the response shape in this PR.",
+    );
 
     let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
 
@@ -106,9 +107,41 @@ fn failure_mode_and_evidence_detection_is_case_insensitive() {
         blocker
             .evidence
             .iter()
-            .any(|value| value.contains("Because response contract")),
+            .any(|value| value.contains("Because status=partial changes the response shape")),
         "evidence should preserve original reviewer text"
     );
+}
+
+#[test]
+fn broad_contract_wording_without_specific_delta_becomes_keyword_only() {
+    let scan =
+        base_scan("This can break consumers in this PR because the response contract changes.");
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert!(gate.residual_blockers.is_empty());
+    assert!(comment.evidence.is_empty());
+    assert_eq!(comment.evidence_class, Some(EvidenceClass::KeywordOnly));
+}
+
+#[test]
+fn unrelated_backtick_reference_does_not_restore_contract_delta() {
+    let scan = base_scan(
+        "This can break consumers in this PR because the response contract changes around `foo`.",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert!(gate.residual_blockers.is_empty());
+    assert_eq!(comment.evidence_class, Some(EvidenceClass::KeywordOnly));
 }
 
 #[test]
@@ -420,4 +453,20 @@ fn partial_scan_keeps_review_signal_unknown() {
     let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
 
     assert_eq!(gate.review_signal, ReviewSignal::Unknown);
+}
+
+#[test]
+fn changes_requested_review_state_stays_informational_when_gate_is_clear() {
+    let mut scan = base_scan("Could we rename this helper for clarity?");
+    scan.pr.review_decisions = vec![String::from("CHANGES_REQUESTED")];
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+    let summary = gate
+        .review_decision_summary
+        .as_ref()
+        .expect("review decision summary");
+
+    assert_eq!(gate.review_signal, ReviewSignal::Clear);
+    assert!(summary.changes_requested);
+    assert!(summary.informational_only);
 }

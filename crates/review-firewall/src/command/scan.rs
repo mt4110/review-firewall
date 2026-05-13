@@ -374,28 +374,30 @@ pub fn parse_pr_url_repository_identity_for_tests(url: &str) -> Option<git::Repo
 }
 
 fn build_pull_request_summary(value: &Value) -> PullRequestSummary {
-    let mut review_decisions = value
+    let review_decisions = value
         .get("reviewDecision")
         .and_then(Value::as_str)
         .filter(|decision| !decision.trim().is_empty())
         .map(|decision| vec![decision.to_owned()])
-        .unwrap_or_default();
-
-    for review_state in value
-        .get("reviews")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(|review| review.get("state").and_then(Value::as_str))
-        .filter(|state| !state.trim().is_empty())
-    {
-        if !review_decisions
-            .iter()
-            .any(|existing| existing == review_state)
-        {
-            review_decisions.push(review_state.to_owned());
-        }
-    }
+        .unwrap_or_else(|| {
+            let mut fallback_states = Vec::<String>::new();
+            for review_state in value
+                .get("reviews")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|review| review.get("state").and_then(Value::as_str))
+                .filter(|state| !state.trim().is_empty())
+            {
+                if !fallback_states
+                    .iter()
+                    .any(|existing| existing == review_state)
+                {
+                    fallback_states.push(review_state.to_owned());
+                }
+            }
+            fallback_states
+        });
 
     PullRequestSummary {
         number: value.get("number").and_then(Value::as_u64),

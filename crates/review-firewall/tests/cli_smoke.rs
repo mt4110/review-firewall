@@ -318,12 +318,15 @@ fn smoke_flow_creates_all_artifacts() {
     let scan = fs::read_to_string(run_dir.join("scan.json")).expect("scan");
     let gate = fs::read_to_string(run_dir.join("gate.json")).expect("gate");
     let escalation = fs::read_to_string(run_dir.join("escalation.md")).expect("escalation");
+    let report = fs::read_to_string(run_dir.join("report.md")).expect("report");
     assert!(scan.contains(r#""thread_id": "issue:21""#));
     assert!(scan.contains(r#""thread_id": "issue:22""#));
     assert!(!scan.contains("issue:conversation"));
     assert!(gate.contains(r#""status": "OK""#));
     assert!(gate.contains(r#""residual_blockers""#));
+    assert!(gate.contains(r#""review_decision_summary""#));
     assert!(escalation.contains("No ADR/RFC candidates were found."));
+    assert!(report.contains("REVIEW_DECISIONS: CHANGES_REQUESTED (informational only)"));
 }
 
 #[test]

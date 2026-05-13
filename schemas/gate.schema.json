@@ -152,6 +152,27 @@
         "why": { "type": "string" }
       },
       "additionalProperties": true
+    },
+    "review_decision_summary": {
+      "type": "object",
+      "required": [
+        "states",
+        "changes_requested",
+        "approved",
+        "review_required",
+        "informational_only"
+      ],
+      "properties": {
+        "states": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "changes_requested": { "type": "boolean" },
+        "approved": { "type": "boolean" },
+        "review_required": { "type": "boolean" },
+        "informational_only": { "const": true }
+      },
+      "additionalProperties": true
     }
   },
   "properties": {
@@ -211,6 +232,9 @@
         "use_codeowners": { "type": "boolean" }
       },
       "additionalProperties": true
+    },
+    "review_decision_summary": {
+      "$ref": "#/$defs/review_decision_summary"
     },
     "classified_comments": {
       "type": "array",

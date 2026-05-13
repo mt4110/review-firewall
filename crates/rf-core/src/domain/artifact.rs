@@ -34,6 +34,37 @@ pub struct PullRequestSummary {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReviewDecisionSummary {
+    pub states: Vec<String>,
+    pub changes_requested: bool,
+    pub approved: bool,
+    pub review_required: bool,
+    pub informational_only: bool,
+}
+
+impl ReviewDecisionSummary {
+    pub fn from_states(states: &[String]) -> Option<Self> {
+        if states.is_empty() {
+            return None;
+        }
+
+        Some(Self {
+            states: states.to_vec(),
+            changes_requested: has_review_state(states, "CHANGES_REQUESTED"),
+            approved: has_review_state(states, "APPROVED"),
+            review_required: has_review_state(states, "REVIEW_REQUIRED"),
+            informational_only: true,
+        })
+    }
+}
+
+fn has_review_state(states: &[String], expected: &str) -> bool {
+    states
+        .iter()
+        .any(|state| state.trim().eq_ignore_ascii_case(expected))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProductBoundarySnapshot {
     pub category: String,
     pub consumes_existing_review_comments: bool,
@@ -208,6 +239,8 @@ pub struct GateArtifact {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
     pub config_snapshot: GateConfigSnapshot,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_decision_summary: Option<ReviewDecisionSummary>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub classified_comments: Vec<ClassifiedComment>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

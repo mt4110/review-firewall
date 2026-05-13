@@ -122,6 +122,16 @@ fn checked_in_demo_artifacts_follow_current_contract() {
     assert_eq!(gate.counts.questions, 154);
     assert_eq!(gate.counts.suggestions, 135);
     assert_eq!(gate.counts.nits, 97);
+    let review_decision_summary = gate
+        .review_decision_summary
+        .as_ref()
+        .expect("demo review decision summary");
+    assert_eq!(
+        review_decision_summary.states,
+        vec![String::from("COMMENTED")]
+    );
+    assert!(!review_decision_summary.changes_requested);
+    assert!(review_decision_summary.informational_only);
 
     assert_eq!(draft.status, Status::Ok);
     assert_eq!(draft.data_coverage, DataCoverage::Full);
@@ -132,6 +142,7 @@ fn checked_in_demo_artifacts_follow_current_contract() {
     assert!(DEMO_REPORT.contains("DATA_COVERAGE: FULL"));
     assert!(DEMO_REPORT.contains("REVIEW_SIGNAL: BLOCKED"));
     assert!(DEMO_REPORT.contains("RESIDUAL_BLOCKERS: 11"));
+    assert!(DEMO_REPORT.contains("REVIEW_DECISIONS: COMMENTED (informational only)"));
     assert!(!DEMO_REPORT.contains("style=flat"));
     assert!(DEMO_ESCALATION.contains("No ADR/RFC candidates were found."));
 }
@@ -233,6 +244,8 @@ fn public_demo_numbers_are_synchronized() {
     assert!(VALIDATION_DOC.contains("comments_analyzed: 397"));
     assert!(VALIDATION_DOC.contains("candidate_blockers: 45"));
     assert!(VALIDATION_DOC.contains("residual_blockers: 11"));
+    assert!(VALIDATION_DOC.contains("seed scaffold"));
+    assert!(VALIDATION_DOC.contains("50-comment release sample"));
 }
 
 #[test]

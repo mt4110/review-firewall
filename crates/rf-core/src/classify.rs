@@ -2,7 +2,8 @@ use crate::dedupe::collapse_duplicates_with_primary_filter;
 use crate::domain::CodeownerRule;
 use crate::domain::{
     BlockerConcern, ClassifiedComment, CommentRecord, CommentType, EvidenceClass, GateArtifact,
-    GateConfigSnapshot, GateCounts, ResidualBlocker, ScanArtifact, Status, review_signal_for,
+    GateConfigSnapshot, GateCounts, ResidualBlocker, ReviewDecisionSummary, ScanArtifact, Status,
+    review_signal_for,
 };
 use crate::escalation::evaluate_escalation_candidates;
 use crate::normalize::{normalize_body, split_sentences};
@@ -84,6 +85,7 @@ pub fn gate_scan(
         duplicates_collapsed,
         warnings: scan.warnings.clone(),
         config_snapshot: config.clone(),
+        review_decision_summary: ReviewDecisionSummary::from_states(&scan.pr.review_decisions),
         classified_comments: classified,
         escalation_candidates: evaluate_escalation_candidates(
             &scan.review_threads,
@@ -613,7 +615,7 @@ fn extract_evidence(comment: &CommentRecord, failure_mode: Option<&str>) -> Vec<
     let normalized_failure_mode = failure_mode.map(normalize_body);
 
     for snippet in backtick_fragments(&comment.body) {
-        if !looks_like_noise_fragment(&snippet) {
+        if looks_like_concrete_reference_fragment(&snippet) {
             evidence.push(format!("comment references `{snippet}`"));
         }
     }
@@ -625,7 +627,8 @@ fn extract_evidence(comment: &CommentRecord, failure_mode: Option<&str>) -> Vec<
         {
             continue;
         }
-        if sentence_supports_evidence(&normalized) {
+        if sentence_supports_evidence(&normalized) && !looks_like_broad_contract_claim(&normalized)
+        {
             evidence.push(sentence);
         }
     }
@@ -690,21 +693,10 @@ fn extract_evidence_class(comment: &CommentRecord, evidence: &[String]) -> Optio
         return Some(EvidenceClass::SecurityCondition);
     }
 
-    if contains_evidence_marker(
-        &normalized_evidence,
-        &[
-            "contract",
-            "schema",
-            "response shape",
-            "request shape",
-            "consumer",
-            "wire format",
-            "status code",
-            "後方互換",
-            "互換",
-            "契約",
-        ],
-    ) {
+    if contains_contract_surface(&normalized_body)
+        && contains_contract_change_marker(&normalized_body)
+        && contains_contract_specific_marker(&normalized_body)
+    {
         return Some(EvidenceClass::ContractDelta);
     }
 
@@ -965,6 +957,12 @@ fn sentence_supports_evidence(text: &str) -> bool {
     )
 }
 
+fn looks_like_broad_contract_claim(text: &str) -> bool {
+    contains_contract_surface(text)
+        && contains_contract_change_marker(text)
+        && !contains_contract_specific_marker(text)
+}
+
 fn contains_evidence_marker(text: &str, needles: &[&str]) -> bool {
     needles
         .iter()
@@ -1019,6 +1017,100 @@ fn sentence_supports_independent_evidence(text: &str) -> bool {
     )
 }
 
+fn contains_contract_surface(text: &str) -> bool {
+    contains_evidence_marker(
+        text,
+        &[
+            "contract",
+            "schema",
+            "response",
+            "request",
+            "consumer",
+            "client",
+            "compatibility",
+            "backward compatibility",
+            "wire format",
+            "content-type",
+            "query param",
+            "serializer",
+            "後方互換",
+            "互換",
+            "契約",
+            "レスポンス",
+            "リクエスト",
+            "クライアント",
+        ],
+    )
+}
+
+fn contains_contract_change_marker(text: &str) -> bool {
+    contains_evidence_marker(
+        text,
+        &[
+            "change",
+            "changes",
+            "changed",
+            "changing",
+            "remove",
+            "removed",
+            "renamed",
+            "rename",
+            "add",
+            "added",
+            "returns",
+            "return",
+            "returned",
+            "now",
+            "no longer",
+            "instead of",
+            "different",
+            "mismatch",
+            "変わ",
+            "変更",
+            "消え",
+            "削除",
+            "増え",
+            "追加",
+            "返す",
+            "返ら",
+            "新値",
+            "必須",
+        ],
+    )
+}
+
+fn contains_contract_specific_marker(text: &str) -> bool {
+    contains_evidence_marker(
+        text,
+        &[
+            "partial status",
+            "partial",
+            "status code",
+            "return code",
+            "response shape",
+            "request shape",
+            "field",
+            "json key",
+            "query param",
+            "enum",
+            "serializer",
+            "content-type",
+            "wire format",
+            "page size",
+            "id type",
+            "id 型",
+            "header",
+            "mime",
+            "404",
+            "200+empty",
+            "レスポンス shape",
+            "レスポンス schema",
+            "レスポンス形式",
+            "status=",
+        ],
+    )
+}
+
 fn contains_any(text: &str, needles: &[&str]) -> bool {
     needles.iter().any(|needle| text.contains(needle))
 }
@@ -1065,6 +1157,80 @@ fn looks_like_noise_fragment(fragment: &str) -> bool {
         || normalized.contains("shields.io")
         || normalized.contains("img.shields.io")
         || normalized.contains("badge")
+}
+
+fn looks_like_concrete_reference_fragment(fragment: &str) -> bool {
+    if looks_like_noise_fragment(fragment) {
+        return false;
+    }
+
+    let normalized = normalize_body(fragment);
+    if normalized.is_empty() {
+        return false;
+    }
+    if matches!(
+        normalized.as_str(),
+        "foo" | "bar" | "baz" | "qux" | "dummy" | "example value" | "placeholder"
+    ) {
+        return false;
+    }
+    if contains_any(
+        &normalized,
+        &[
+            "partial",
+            "status",
+            "json",
+            "query",
+            "header",
+            "content-type",
+            "schema",
+            "field",
+            "enum",
+            "format",
+            "response",
+            "request",
+            "serializer",
+            "page",
+            "mime",
+            "メトリクス",
+        ],
+    ) {
+        return true;
+    }
+    if fragment.contains(char::is_whitespace) {
+        return true;
+    }
+    if matches!(
+        normalized.as_str(),
+        "sql" | "xss" | "csrf" | "ssrf" | "html" | "utc" | "db" | "ci"
+    ) {
+        return true;
+    }
+    if normalized.len() >= 4
+        && fragment
+            .chars()
+            .all(|character| character.is_ascii_alphabetic())
+    {
+        return true;
+    }
+
+    fragment.chars().any(|character| {
+        character.is_ascii_digit()
+            || matches!(
+                character,
+                '/' | '\\' | '_' | '-' | '.' | '=' | '(' | ')' | '[' | ']' | ':' | '<' | '>'
+            )
+    }) || has_mixed_case_identifier(fragment)
+}
+
+fn has_mixed_case_identifier(fragment: &str) -> bool {
+    let has_lower = fragment
+        .chars()
+        .any(|character| character.is_ascii_lowercase());
+    let has_upper = fragment
+        .chars()
+        .any(|character| character.is_ascii_uppercase());
+    has_lower && has_upper
 }
 
 fn looks_like_path_only_text(body: &str, path: &str) -> bool {
