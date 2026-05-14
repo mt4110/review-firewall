@@ -148,6 +148,43 @@ fn metalinguistic_failure_mode_extractor_is_not_treated_as_runtime_failure_mode(
 }
 
 #[test]
+fn metalinguistic_failure_mode_wrong_wording_stays_non_runtime() {
+    let scan = base_scan("The failure-mode extractor wording is wrong in the docs for this PR.");
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert_eq!(
+        comment.comment_type,
+        rf_core::domain::CommentType::Suggestion
+    );
+    assert_eq!(comment.failure_mode, None);
+    assert!(gate.residual_blockers.is_empty());
+}
+
+#[test]
+fn metalinguistic_failure_mode_docs_fail_to_explain_stays_non_runtime() {
+    let scan =
+        base_scan("The failure-mode extractor docs fail to explain the narrower wording here.");
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert_eq!(
+        comment.comment_type,
+        rf_core::domain::CommentType::Suggestion
+    );
+    assert_eq!(comment.failure_mode, None);
+    assert!(gate.residual_blockers.is_empty());
+}
+
+#[test]
 fn docker_word_does_not_trigger_doc_meta_filter_by_substring() {
     let scan = base_scan(
         "This PR breaks failure-mode extractor behavior in Docker jobs, so true blockers are dropped.",

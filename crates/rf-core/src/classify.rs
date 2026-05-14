@@ -611,23 +611,22 @@ fn is_metalinguistic_failure_mode_context(text: &str) -> bool {
         text,
         &["簡潔", "説明", "表現", "文言", "言い方", "言い回し"],
     );
-    let mentions_runtime_classifier_breakage = has_failure_mode_signal(text)
-        || contains_evidence_marker(
-            text,
-            &[
-                "partial",
-                "status=",
-                "residual blocker",
-                "true blocker",
-                "dropped",
-                "drop",
-                "missing",
-                "誤判定",
-                "見落と",
-                "取りこぼ",
-                "壊れ",
-            ],
-        );
+    let mentions_runtime_classifier_breakage = contains_evidence_marker(
+        text,
+        &[
+            "partial",
+            "status=",
+            "residual blocker",
+            "true blocker",
+            "dropped",
+            "drop",
+            "missing",
+            "誤判定",
+            "見落と",
+            "取りこぼ",
+            "壊れ",
+        ],
+    );
 
     mentions_failure_mode_logic && mentions_meta_wording && !mentions_runtime_classifier_breakage
 }
