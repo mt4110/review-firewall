@@ -227,6 +227,47 @@ fn metalinguistic_comment_with_runtime_fail_context_still_extracts_failure_mode(
 }
 
 #[test]
+fn metalinguistic_comment_with_runtime_failure_noun_still_extracts_failure_mode() {
+    let scan = base_scan(
+        "The failure-mode extractor documentation is wrong because it causes a failure in rollback handling.",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert!(
+        comment
+            .failure_mode
+            .as_deref()
+            .is_some_and(|value| value.contains("failure in rollback handling")),
+        "runtime failure-noun details should survive even when wording/docs are mentioned"
+    );
+}
+
+#[test]
+fn runtime_failure_noun_still_extracts_failure_mode() {
+    let scan =
+        base_scan("This PR introduces a failure in rollback handling when retries are enabled.");
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert!(
+        comment
+            .failure_mode
+            .as_deref()
+            .is_some_and(|value| value.contains("failure in rollback handling")),
+        "runtime failure-noun phrasing should remain a failure-mode signal"
+    );
+}
+
+#[test]
 fn docker_word_does_not_trigger_doc_meta_filter_by_substring() {
     let scan = base_scan(
         "This PR breaks failure-mode extractor behavior in Docker jobs, so true blockers are dropped.",
