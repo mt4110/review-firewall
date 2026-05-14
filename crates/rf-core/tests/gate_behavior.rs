@@ -227,6 +227,26 @@ fn metalinguistic_comment_with_runtime_fail_context_still_extracts_failure_mode(
 }
 
 #[test]
+fn metalinguistic_comment_with_plain_runtime_fails_still_extracts_failure_mode() {
+    let scan =
+        base_scan("The failure-mode extractor docs are wrong because it fails after retries.");
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert!(
+        comment
+            .failure_mode
+            .as_deref()
+            .is_some_and(|value| value.contains("it fails after retries")),
+        "plain runtime fail verbs should survive even when wording/docs are mentioned"
+    );
+}
+
+#[test]
 fn metalinguistic_comment_with_runtime_failure_noun_still_extracts_failure_mode() {
     let scan = base_scan(
         "The failure-mode extractor documentation is wrong because it causes a failure in rollback handling.",
