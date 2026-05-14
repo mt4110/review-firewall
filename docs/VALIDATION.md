@@ -13,7 +13,7 @@ The checked-in demo mirrors the current artifact contract and keeps the full 45-
 It still trims heavy fields such as the full comment list and the full review-thread list.
 For manual validation, sampled non-residual rows are traceable through the checked-in `gate.json.classified_comments` slice.
 The checked-in corpus is currently a 12-row seed scaffold, not the full 50-comment release sample.
-Its checked-in metadata intentionally stays at `release_usable: false` with both human-recorded rates left unset.
+Its checked-in metadata intentionally stays at `human_confirmed: false` and `release_usable: false`, with both human-recorded rates left unset.
 It is enough to prove traceability and schema shape, but not enough to publish the first release-usable human validation rates yet.
 
 ## Current scaffold status
@@ -21,17 +21,25 @@ It is enough to prove traceability and schema shape, but not enough to publish t
 ```text
 sampled_rows: 12
 target_release_sample: 50
+human_confirmed: false
 release_usable: false
 false_residual_rate: not yet recorded
 missed_obvious_blocker_rate: not yet recorded
 ```
+
+Promotion gate:
+
+- reaching 50 rows is necessary but not sufficient
+- the checked-in sample must be human-confirmed before it can claim release-usable rates
+- `recorded_metrics.false_residual_rate` and `recorded_metrics.missed_obvious_blocker_rate` must both be populated from that checked-in sample
+- `release_usable_reason` should explain which gate is still unmet, or document the promotion once all gates pass
 
 Next operator step:
 
 - expand the checked-in corpus by at least 38 more human-labeled comments
 - keep every new row traceable to the checked-in dogfood demo artifacts
 - record the first release-usable `false_residual_rate` and `missed_obvious_blocker_rate`
-- flip the corpus metadata to `release_usable: true` only after those rates are actually recorded
+- flip `human_confirmed: true` and `release_usable: true` only after those rates are actually recorded from the checked-in human sample
 
 ## Metrics
 
@@ -129,10 +137,15 @@ The v0.1 scaffold intentionally stays manual and file-based.
 The checked-in corpus also records top-level scaffold metadata:
 
 - `sample_target`
+- `human_confirmed`
 - `release_usable`
 - `release_usable_reason`
 - `recorded_metrics.false_residual_rate`
 - `recorded_metrics.missed_obvious_blocker_rate`
+
+`human_confirmed` means a human has reviewed the checked-in labels and the recorded release metrics for this sample.
+It should stay `false` for provisional or partially expanded corpus updates.
+When recorded, `recorded_metrics.*` values should be stored as decimal ratios derived from the checked-in sample, not rounded percentages, and encoded with the shortest round-trip IEEE-754 `f64` decimal representation.
 
 Each labeled row records:
 
@@ -160,6 +173,12 @@ Allowed `manual_label` values:
 - `design_debate`
 - `unknown`
 - `noise`
+
+`release_usable` must stay `false` whenever any of these remain true:
+
+- sampled rows are still below `sample_target`
+- the checked-in sample is not yet human-confirmed
+- either recorded release metric is still unset
 
 ## What is still manual
 

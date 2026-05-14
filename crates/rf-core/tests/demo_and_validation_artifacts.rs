@@ -42,6 +42,7 @@ struct ManualLabelCorpus {
     kind: String,
     language: String,
     sample_target: usize,
+    human_confirmed: bool,
     release_usable: bool,
     release_usable_reason: String,
     recorded_metrics: RecordedMetrics,
@@ -174,6 +175,37 @@ fn manual_label_corpus_scaffold_is_well_formed() {
         !corpus.release_usable_reason.trim().is_empty(),
         "release_usable_reason should explain why the corpus is or is not ready"
     );
+    if !corpus.human_confirmed {
+        assert!(
+            corpus.release_usable_reason.contains("human-confirmed"),
+            "non-human-confirmed corpus should say that release validation still needs human confirmation"
+        );
+    }
+    if corpus.cases.len() < corpus.sample_target {
+        assert!(
+            corpus.release_usable_reason.contains("50")
+                || corpus.release_usable_reason.contains("sample target"),
+            "release_usable_reason should explain when the sample target is still unmet"
+        );
+    }
+    if corpus.recorded_metrics.false_residual_rate.is_none() {
+        assert!(
+            corpus.release_usable_reason.contains("false_residual_rate"),
+            "release_usable_reason should call out a missing false_residual_rate"
+        );
+    }
+    if corpus
+        .recorded_metrics
+        .missed_obvious_blocker_rate
+        .is_none()
+    {
+        assert!(
+            corpus
+                .release_usable_reason
+                .contains("missed_obvious_blocker_rate"),
+            "release_usable_reason should call out a missing missed_obvious_blocker_rate"
+        );
+    }
 
     assert_eq!(
         corpus.source_run.demo_path,
@@ -256,6 +288,7 @@ fn checked_in_manual_label_corpus_matches_current_scaffold_state() {
         serde_yaml::from_str(MANUAL_LABEL_CORPUS).expect("manual label corpus");
 
     assert_eq!(corpus.cases.len(), 12);
+    assert!(!corpus.human_confirmed);
     assert!(!corpus.release_usable);
     assert_eq!(corpus.sample_target, 50);
     assert!(
@@ -272,6 +305,45 @@ fn checked_in_manual_label_corpus_matches_current_scaffold_state() {
 }
 
 #[test]
+fn release_usable_corpus_requires_sample_size_metrics_and_human_confirmation() {
+    let corpus: ManualLabelCorpus =
+        serde_yaml::from_str(MANUAL_LABEL_CORPUS).expect("manual label corpus");
+
+    assert!(
+        !corpus.release_usable || corpus.human_confirmed,
+        "release_usable corpus must be human-confirmed"
+    );
+
+    if corpus.release_usable {
+        assert!(
+            corpus.cases.len() >= corpus.sample_target,
+            "release_usable corpus must meet or exceed the sample target"
+        );
+        let recorded_false_residual = corpus
+            .recorded_metrics
+            .false_residual_rate
+            .expect("release_usable corpus should record false_residual_rate");
+        let recorded_missed_obvious = corpus
+            .recorded_metrics
+            .missed_obvious_blocker_rate
+            .expect("release_usable corpus should record missed_obvious_blocker_rate");
+
+        assert_rate_matches(
+            recorded_false_residual,
+            derive_false_residual_rate(&corpus)
+                .expect("release_usable corpus should have residual rows to score"),
+            "false_residual_rate",
+        );
+        assert_rate_matches(
+            recorded_missed_obvious,
+            derive_missed_obvious_blocker_rate(&corpus)
+                .expect("release_usable corpus should have obvious blockers to score"),
+            "missed_obvious_blocker_rate",
+        );
+    }
+}
+
+#[test]
 fn public_demo_numbers_are_synchronized() {
     for document in [README_EN, README_JA, DEMO_README] {
         assert!(document.contains("397 comments analyzed"));
@@ -285,13 +357,17 @@ fn public_demo_numbers_are_synchronized() {
     assert!(VALIDATION_DOC.contains("12-row seed scaffold"));
     assert!(VALIDATION_DOC.contains("sampled_rows: 12"));
     assert!(VALIDATION_DOC.contains("target_release_sample: 50"));
+    assert!(VALIDATION_DOC.contains("human_confirmed: false"));
     assert!(VALIDATION_DOC.contains("release_usable: false"));
     assert!(VALIDATION_DOC.contains("release_usable_reason"));
     assert!(VALIDATION_DOC.contains("false_residual_rate: not yet recorded"));
     assert!(VALIDATION_DOC.contains("missed_obvious_blocker_rate: not yet recorded"));
+    assert!(VALIDATION_DOC.contains("reaching 50 rows is necessary but not sufficient"));
+    assert!(VALIDATION_DOC.contains("the checked-in sample must be human-confirmed"));
+    assert!(VALIDATION_DOC.contains("shortest round-trip IEEE-754 `f64` decimal representation"));
     assert!(DEMO_README.contains("12-row seed sample"));
     assert!(DEFERRED_DOC.contains("12-row traceable scaffold"));
-    assert!(DEFERRED_DOC.contains("50-comment sample"));
+    assert!(DEFERRED_DOC.contains("human-confirmed 50-comment sample"));
     assert!(
         !FREEZE_AUDIT_DOC
             .contains("First-class downstream `reviewDecision` behavior is explicitly deferred.")
@@ -340,4 +416,52 @@ fn demo_traceable_ids(gate: &GateArtifact) -> BTreeSet<&str> {
         ids.insert(comment.comment.comment_id.as_str());
     }
     ids
+}
+
+fn derive_false_residual_rate(corpus: &ManualLabelCorpus) -> Option<f64> {
+    let residual_rows = corpus
+        .cases
+        .iter()
+        .filter(|case| case.observed_bucket == ObservedBucket::ResidualBlocker)
+        .count();
+    if residual_rows == 0 {
+        return None;
+    }
+
+    let false_residual_rows = corpus
+        .cases
+        .iter()
+        .filter(|case| {
+            case.observed_bucket == ObservedBucket::ResidualBlocker
+                && case.manual_label != ManualLabel::TrueBlocker
+        })
+        .count();
+    Some(false_residual_rows as f64 / residual_rows as f64)
+}
+
+fn derive_missed_obvious_blocker_rate(corpus: &ManualLabelCorpus) -> Option<f64> {
+    let obvious_rows = corpus
+        .cases
+        .iter()
+        .filter(|case| case.obvious_blocker)
+        .count();
+    if obvious_rows == 0 {
+        return None;
+    }
+
+    let missed_rows = corpus
+        .cases
+        .iter()
+        .filter(|case| {
+            case.obvious_blocker && case.observed_bucket != ObservedBucket::ResidualBlocker
+        })
+        .count();
+    Some(missed_rows as f64 / obvious_rows as f64)
+}
+
+fn assert_rate_matches(actual: f64, expected: f64, metric_name: &str) {
+    assert!(
+        actual.to_bits() == expected.to_bits(),
+        "{metric_name} should match the checked-in corpus exactly: actual={actual}, expected={expected}"
+    );
 }
