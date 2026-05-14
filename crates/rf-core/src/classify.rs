@@ -765,6 +765,7 @@ fn contains_contextual_failure_phrase(text: &str) -> bool {
             "matching fail",
             "matching fails",
             "matching failed",
+            "failure to ",
             "failure in ",
             "failure on ",
             "failure with ",
