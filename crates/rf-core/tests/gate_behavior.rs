@@ -148,6 +148,27 @@ fn metalinguistic_failure_mode_extractor_is_not_treated_as_runtime_failure_mode(
 }
 
 #[test]
+fn docker_word_does_not_trigger_doc_meta_filter_by_substring() {
+    let scan = base_scan(
+        "This PR breaks failure-mode extractor behavior in Docker jobs, so true blockers are dropped.",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert!(
+        comment
+            .failure_mode
+            .as_deref()
+            .is_some_and(|value| value.contains("Docker jobs")),
+        "docker should not be mistaken for a doc/docs wording marker"
+    );
+}
+
+#[test]
 fn classifier_breakage_comment_still_extracts_failure_mode() {
     let scan = base_scan(
         "This PR breaks failure-mode matching for partial status, so true blockers are dropped.",

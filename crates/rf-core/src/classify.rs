@@ -574,40 +574,7 @@ fn extract_failure_mode(body: &str) -> Option<String> {
         let normalized = normalize_body(sentence);
         normalized.starts_with("mode:")
             || (!is_metalinguistic_failure_mode_context(&normalized)
-                && contains_any(
-                    &normalized,
-                    &[
-                        "break",
-                        "broken",
-                        "fail",
-                        "fails",
-                        "incorrect",
-                        "wrong",
-                        "regress",
-                        "timeout",
-                        "leak",
-                        "drop",
-                        "incompatible",
-                        "panic",
-                        "crash",
-                        "壊れる",
-                        "壊れ",
-                        "落ちる",
-                        "漏れる",
-                        "漏えい",
-                        "詰まる",
-                        "遅くなる",
-                        "崩れる",
-                        "ずれる",
-                        "失敗",
-                        "誤動作",
-                        "二重送信",
-                        "タイムアウト",
-                        "stale",
-                        "古い値",
-                        "wrap",
-                    ],
-                ))
+                && has_failure_mode_signal(&normalized))
     })
 }
 
@@ -626,12 +593,11 @@ fn is_metalinguistic_failure_mode_context(text: &str) -> bool {
             "failure_mode matching",
         ],
     );
-    let mentions_meta_wording = contains_any(
+    let mentions_meta_wording = contains_scope_marker(
         text,
         &[
             "wording",
             "docs",
-            "doc",
             "documentation",
             "explanation",
             "description",
@@ -640,40 +606,77 @@ fn is_metalinguistic_failure_mode_context(text: &str) -> bool {
             "rename",
             "term",
             "narrower",
-            "簡潔",
-            "説明",
-            "表現",
-            "文言",
-            "言い方",
-            "言い回し",
         ],
-    );
-    let mentions_runtime_classifier_breakage = contains_any(
+    ) || contains_any(
         text,
-        &[
-            "this pr",
-            "in this pr",
-            "this change",
-            "current change",
-            "as written",
-            "partial",
-            "status=",
-            "residual blocker",
-            "true blocker",
-            "dropped",
-            "drop",
-            "missing",
-            "regress",
-            "broken",
-            "wrong",
-            "誤判定",
-            "見落と",
-            "取りこぼ",
-            "壊れ",
-        ],
+        &["簡潔", "説明", "表現", "文言", "言い方", "言い回し"],
     );
+    let mentions_runtime_classifier_breakage = has_failure_mode_signal(text)
+        || contains_evidence_marker(
+            text,
+            &[
+                "partial",
+                "status=",
+                "residual blocker",
+                "true blocker",
+                "dropped",
+                "drop",
+                "missing",
+                "誤判定",
+                "見落と",
+                "取りこぼ",
+                "壊れ",
+            ],
+        );
 
     mentions_failure_mode_logic && mentions_meta_wording && !mentions_runtime_classifier_breakage
+}
+
+fn has_failure_mode_signal(text: &str) -> bool {
+    contains_evidence_marker(
+        text,
+        &[
+            "break",
+            "breaks",
+            "broken",
+            "fail",
+            "fails",
+            "failed",
+            "failures",
+            "incorrect",
+            "wrong",
+            "regress",
+            "regresses",
+            "timeout",
+            "timeouts",
+            "leak",
+            "leaks",
+            "drop",
+            "drops",
+            "dropped",
+            "incompatible",
+            "panic",
+            "panics",
+            "crash",
+            "crashes",
+            "壊れる",
+            "壊れ",
+            "落ちる",
+            "漏れる",
+            "漏えい",
+            "詰まる",
+            "遅くなる",
+            "崩れる",
+            "ずれる",
+            "失敗",
+            "誤動作",
+            "二重送信",
+            "タイムアウト",
+            "stale",
+            "古い値",
+            "wrap",
+        ],
+    )
 }
 
 fn extract_evidence(comment: &CommentRecord, failure_mode: Option<&str>) -> Vec<String> {
