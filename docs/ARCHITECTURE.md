@@ -342,6 +342,7 @@ The following are **not enough by themselves**:
 - changed file path mentions a risky subsystem
 - reviewer sounds confident
 - broad contract wording without a concrete delta, repro, or reference
+- metalinguistic remarks about the failure-mode extractor or matching logic
 
 Evidence should come from at least one of:
 

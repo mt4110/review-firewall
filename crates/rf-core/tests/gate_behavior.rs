@@ -129,6 +129,63 @@ fn broad_contract_wording_without_specific_delta_becomes_keyword_only() {
 }
 
 #[test]
+fn metalinguistic_failure_mode_extractor_is_not_treated_as_runtime_failure_mode() {
+    let scan =
+        base_scan("The failure-mode extractor wording could be narrower in the docs for this PR.");
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert_eq!(
+        comment.comment_type,
+        rf_core::domain::CommentType::Suggestion
+    );
+    assert_eq!(comment.failure_mode, None);
+    assert!(gate.residual_blockers.is_empty());
+}
+
+#[test]
+fn classifier_breakage_comment_still_extracts_failure_mode() {
+    let scan = base_scan(
+        "This PR breaks failure-mode matching for partial status, so true blockers are dropped.",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert_eq!(
+        comment.failure_mode.as_deref(),
+        Some(
+            "This PR breaks failure-mode matching for partial status, so true blockers are dropped"
+        )
+    );
+}
+
+#[test]
+fn operational_failure_path_still_counts_as_runtime_failure_mode() {
+    let scan = base_scan(
+        "This PR adds a new failure path without `metrics`, so failures will not be detected during rollout.",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let blocker = gate.residual_blockers.first().expect("residual blocker");
+    assert_eq!(blocker.concern, BlockerConcern::Operability);
+    assert!(
+        blocker
+            .failure_mode
+            .contains("failures will not be detected"),
+        "real failure-path comments should still extract a concrete failure mode"
+    );
+}
+
+#[test]
 fn auth_runtime_sentence_is_not_filtered_as_contract_only() {
     let scan = base_scan(
         "This can leak the auth token in this PR because when this request returns 500, clients retry with the same secret.",

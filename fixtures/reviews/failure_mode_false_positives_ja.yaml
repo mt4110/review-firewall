@@ -1,0 +1,30 @@
+version: 1
+kind: synthetic_failure_mode_false_positive_cases
+language: ja
+notes:
+  - failure-mode extractor / matching へのメタ言及が concrete failure mode に誤昇格しないことを固定する synthetic fixtures。
+  - 全件 non-blocking 想定で、expected.concern は null。
+  - runtime failure を指しているのではなく、判定ロジックや説明文の wording を論じているケースだけを集める。
+cases:
+  - id: failure_mode_fp_001
+    category: extractor_wording
+    trigger_token_ja: failure-mode extractor
+    comment_ja: failure-mode extractor という説明は少し強いので、別の言い方にしたいです。
+    expected:
+      type: suggestion
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: extractor 自体の wording であり runtime failure mode ではない。
+  - id: failure_mode_fp_002
+    category: matching_wording
+    trigger_token_ja: failure-mode matching
+    comment_ja: failure-mode matching の説明は docs に寄せて、ここでは簡潔にしたいです。
+    expected:
+      type: suggestion
+      blocker: false
+      concern: null
+      reply: decline
+      escalate: stay_in_pr
+    reason_ja: matching logic へのメタ言及であり PR-local failure を指していない。
