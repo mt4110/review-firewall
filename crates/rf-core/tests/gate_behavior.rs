@@ -189,6 +189,40 @@ fn classifier_breakage_comment_still_extracts_failure_mode() {
 }
 
 #[test]
+fn inflected_failure_verbs_still_extract_failure_mode() {
+    for (body, expected_fragment) in [
+        (
+            "The failure-mode extractor is failing in Docker jobs, so true blockers are dropped.",
+            "failing in Docker jobs",
+        ),
+        (
+            "This change regressed failure-mode matching for partial status, so true blockers are dropped.",
+            "regressed failure-mode matching",
+        ),
+        (
+            "The current branch introduces failure-mode breakage in partial scans, so true blockers are dropped.",
+            "failure-mode breakage in partial scans",
+        ),
+    ] {
+        let scan = base_scan(body);
+
+        let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+        let comment = gate
+            .classified_comments
+            .first()
+            .expect("classified comment");
+        assert!(
+            comment
+                .failure_mode
+                .as_deref()
+                .is_some_and(|value| value.contains(expected_fragment)),
+            "expected failure_mode to retain inflected runtime signal for: {body}"
+        );
+    }
+}
+
+#[test]
 fn operational_failure_path_still_counts_as_runtime_failure_mode() {
     let scan = base_scan(
         "This PR adds a new failure path without `metrics`, so failures will not be detected during rollout.",
