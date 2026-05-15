@@ -105,6 +105,7 @@ fn classify_comment(
     config: &GateConfigSnapshot,
     codeowner_rules: &[CodeownerRule],
 ) -> ClassifiedComment {
+    let normalized_body = normalize_body(&comment.body);
     let concern = extract_concern(&comment.body);
     let failure_mode = extract_failure_mode(&comment.body);
     let evidence = extract_evidence(comment, failure_mode.as_deref());
@@ -136,7 +137,7 @@ fn classify_comment(
         && !preference_only;
 
     let alternative_present = contains_any(
-        &normalize_body(&comment.body),
+        &normalized_body,
         &[
             "alternative",
             "instead",
@@ -160,7 +161,11 @@ fn classify_comment(
         CommentType::Nit
     } else if is_question(&comment.body) {
         CommentType::Question
-    } else if is_suggestion(&comment.body) || concern.is_some() {
+    } else if is_suggestion(&comment.body)
+        || concern.is_some()
+        || is_metalinguistic_context(&normalized_body)
+        || is_metalinguistic_failure_mode_context(&normalized_body)
+    {
         CommentType::Suggestion
     } else if comment.body.trim().is_empty() {
         CommentType::Unknown
@@ -524,7 +529,7 @@ fn is_metalinguistic_context(text: &str) -> bool {
 }
 
 fn has_runtime_risk_context(text: &str) -> bool {
-    contains_any(
+    contains_evidence_marker(
         text,
         &[
             "壊れ",
@@ -548,9 +553,8 @@ fn has_runtime_risk_context(text: &str) -> bool {
             "戻らない",
             "枯渇",
             "panic する",
-            "break ",
+            "break",
             "broken",
-            "fail",
             "leak",
             "xss",
             "csrf",
@@ -566,7 +570,7 @@ fn has_runtime_risk_context(text: &str) -> bool {
             "contention",
             "タイムアウト",
         ],
-    )
+    ) || contains_contextual_failure_phrase(text)
 }
 
 fn extract_failure_mode(body: &str) -> Option<String> {
