@@ -328,6 +328,9 @@ fn smoke_flow_creates_all_artifacts() {
     assert!(gate.contains(r#""review_decision_summary""#));
     assert!(escalation.contains("No ADR/RFC candidates were found."));
     assert!(report.contains("REVIEW_DECISIONS: CHANGES_REQUESTED (informational only)"));
+    assert!(report.contains("## Source coverage"));
+    assert!(report.contains("Review-input coverage: FULL"));
+    assert!(report.contains("- PR metadata: FULL (required, 1 seen)"));
 }
 
 #[test]
@@ -755,6 +758,8 @@ fn stopless_partial_path_still_writes_artifacts() {
     assert!(scan.contains("src/local_only.rs"));
     assert!(scan.contains("src/scratch.rs"));
     assert!(report.contains("STATUS: PARTIAL"));
+    assert!(report.contains("## Source coverage"));
+    assert!(report.contains("Review-input coverage: FAILED"));
 }
 
 fn run(command: &mut Command) {

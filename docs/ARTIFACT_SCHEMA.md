@@ -344,6 +344,9 @@ Must include three sections:
 2. PM summary
 3. author action list
 
+When `source_coverage.json` is available, `report.md` should also surface it in a dedicated
+`source coverage` section so incomplete review inputs are visible without opening JSON artifacts.
+
 When top-level review-decision state is available, `report.md` may also surface it as informational reviewer state.
 
 Suggested shape:
@@ -369,6 +372,14 @@ Action: decide contract handling in this PR or move schema redesign to ADR
 1. Reply accept to comment #12
 2. Reply move-to-ADR to thread #3
 3. Update response contract test
+
+## Source coverage
+Review-input coverage: FULL
+Incomplete required sources: 0
+- PR metadata: FULL (required, 1 seen)
+- changed files: FULL (required, 8 seen)
+- review comments: FULL (required, 17 seen)
+- issue comments: FULL (required, 4 seen)
 ```
 
 ## Compatibility rules

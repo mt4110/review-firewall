@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
 
 use rf_core::domain::{
-    DataCoverage, DraftReplyArtifact, GateArtifact, ReviewSignal, ScanArtifact, Status,
+    DataCoverage, DraftReplyArtifact, GateArtifact, ReviewSignal, ScanArtifact,
+    SourceCoverageArtifact, SourceCoverageStatus, Status,
 };
-use rf_core::{ReportHeader, build_report_markdown};
+use rf_core::{ReportHeader, ReportInputs, build_report_markdown};
 use serde::de::DeserializeOwned;
 
 use crate::adapter::git;
@@ -19,6 +20,12 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
         "scan.json",
         Status::Error,
         "scan.json not found; run review-firewall scan first",
+    );
+    let source_coverage = read_json_artifact::<SourceCoverageArtifact>(
+        run.directory.join("source_coverage.json"),
+        "source_coverage.json",
+        Status::Partial,
+        "source_coverage.json not found; run review-firewall scan first",
     );
     let gate = read_json_artifact::<GateArtifact>(
         run.directory.join("gate.json"),
@@ -68,10 +75,17 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
                 .unwrap_or(0),
         },
         summary.reason.as_deref(),
-        scan.value.as_ref(),
-        gate.value.as_ref(),
-        draft.value.as_ref(),
-        escalation.value.as_deref(),
+        ReportInputs {
+            scan: scan.value.as_ref(),
+            source_coverage: source_coverage.value.as_ref(),
+            source_coverage_notice: source_coverage
+                .problem
+                .as_ref()
+                .map(|problem| problem.reason.as_str()),
+            gate: gate.value.as_ref(),
+            draft_reply: draft.value.as_ref(),
+            escalation_markdown: escalation.value.as_deref(),
+        },
     );
     artifacts::write_text(run.directory.join("report.md"), &markdown).map_err(io_error)?;
 
@@ -94,6 +108,10 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
                     .as_ref()
                     .map(|artifact| artifact.residual_blockers.len())
                     .unwrap_or(0)
+            ),
+            source_coverage_summary_line(
+                source_coverage.value.as_ref(),
+                source_coverage.problem.as_ref(),
             ),
             String::from("PM summary ready: yes"),
             format!("Author actions: {action_count}"),
@@ -187,6 +205,29 @@ fn count_author_actions(markdown: &str) -> usize {
         .lines()
         .filter(|line| is_numbered_action(line.trim()))
         .count()
+}
+
+fn source_coverage_summary_line(
+    artifact: Option<&SourceCoverageArtifact>,
+    problem: Option<&ArtifactProblem>,
+) -> String {
+    if let Some(artifact) = artifact {
+        let incomplete_required = artifact
+            .sources
+            .iter()
+            .filter(|source| source.required && source.status != SourceCoverageStatus::Full)
+            .count();
+        return format!(
+            "Source coverage: {} ({incomplete_required} incomplete required sources)",
+            artifact.data_coverage.terminal_label()
+        );
+    }
+
+    if let Some(problem) = problem {
+        return format!("Source coverage: unavailable ({})", problem.reason);
+    }
+
+    String::from("Source coverage: unavailable")
 }
 
 fn is_numbered_action(line: &str) -> bool {

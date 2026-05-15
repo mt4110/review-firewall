@@ -3,9 +3,10 @@ use rf_core::domain::{
     AdvisoryWeight, BlockerConcern, ClassifiedComment, CommentRecord, CommentSource, CommentType,
     DataCoverage, DraftReplyArtifact, EscalationCandidate, EscalationLabel, EvidenceClass,
     GateArtifact, GateConfigSnapshot, GateCounts, ReplyType, ResidualBlocker,
-    ReviewDecisionSummary, ReviewSignal, ScanArtifact, Status,
+    ReviewDecisionSummary, ReviewSignal, ScanArtifact, SourceCoverageArtifact, SourceCoverageEntry,
+    SourceCoverageName, SourceCoverageStatus, SourceFailureReason, Status,
 };
-use rf_core::{ReportHeader, build_report_markdown};
+use rf_core::{ReportHeader, ReportInputs, build_report_markdown};
 
 #[test]
 fn draft_reply_respects_max_lines() {
@@ -188,40 +189,47 @@ fn report_contains_required_sections() {
             residual_blockers: 1,
         },
         None,
-        Some(&ScanArtifact {
-            status: Status::Ok,
-            data_coverage: DataCoverage::Full,
-            review_signal: ReviewSignal::Unknown,
-            reason: None,
-            scan_partial: false,
-            repo_root: Some(String::from("/tmp/review-firewall")),
-            branch: Some(String::from("feature/test")),
-            pr: Default::default(),
-            files_changed: 1,
-            review_comments: 1,
-            threads: 1,
-            codeowners_found: false,
-            policy_found: false,
-            product_boundary: Default::default(),
-            changed_files: Vec::new(),
-            comments: Vec::new(),
-            issue_comments: Vec::new(),
-            review_threads: Vec::new(),
-            partial_sources: Vec::new(),
-            warnings: Vec::new(),
-        }),
-        Some(&gate),
-        Some(&draft),
-        Some("# Escalation\n\nNo ADR/RFC candidates were found."),
+        ReportInputs {
+            scan: Some(&ScanArtifact {
+                status: Status::Ok,
+                data_coverage: DataCoverage::Full,
+                review_signal: ReviewSignal::Unknown,
+                reason: None,
+                scan_partial: false,
+                repo_root: Some(String::from("/tmp/review-firewall")),
+                branch: Some(String::from("feature/test")),
+                pr: Default::default(),
+                files_changed: 1,
+                review_comments: 1,
+                threads: 1,
+                codeowners_found: false,
+                policy_found: false,
+                product_boundary: Default::default(),
+                changed_files: Vec::new(),
+                comments: Vec::new(),
+                issue_comments: Vec::new(),
+                review_threads: Vec::new(),
+                partial_sources: Vec::new(),
+                warnings: Vec::new(),
+            }),
+            source_coverage: Some(&full_source_coverage()),
+            gate: Some(&gate),
+            draft_reply: Some(&draft),
+            escalation_markdown: Some("# Escalation\n\nNo ADR/RFC candidates were found."),
+            ..Default::default()
+        },
     );
 
     assert!(report.contains("## Residual blockers"));
     assert!(report.contains("## PM summary"));
     assert!(report.contains("## Author action list"));
+    assert!(report.contains("## Source coverage"));
     assert!(report.contains("RUN_STATUS: OK"));
     assert!(report.contains("DATA_COVERAGE: FULL"));
     assert!(report.contains("REVIEW_SIGNAL: BLOCKED"));
     assert!(report.contains("RESIDUAL_BLOCKERS: 1"));
+    assert!(report.contains("Review-input coverage: FULL"));
+    assert!(report.contains("- PR metadata: FULL (required, 1 seen)"));
 }
 
 #[test]
@@ -234,10 +242,10 @@ fn report_counts_non_adr_escalation_candidates() {
             residual_blockers: 0,
         },
         None,
-        None,
-        None,
-        None,
-        Some("# Escalation\n\n# RFC Candidate\n\n## Title\nAPI policy"),
+        ReportInputs {
+            escalation_markdown: Some("# Escalation\n\n# RFC Candidate\n\n## Title\nAPI policy"),
+            ..Default::default()
+        },
     );
 
     assert!(report.contains("Action: move the long-running design thread to ADR/RFC"));
@@ -256,14 +264,19 @@ fn report_avoids_no_blocker_claim_when_analysis_is_partial() {
             residual_blockers: 0,
         },
         Some("CODEOWNERS could not be read"),
-        None,
-        Some(&gate),
-        None,
-        Some("# Escalation\n\nNo ADR/RFC candidates were found."),
+        ReportInputs {
+            source_coverage: Some(&partial_source_coverage()),
+            gate: Some(&gate),
+            escalation_markdown: Some("# Escalation\n\nNo ADR/RFC candidates were found."),
+            ..Default::default()
+        },
     );
 
     assert!(report.contains("- unknown: blocker analysis did not complete"));
     assert!(report.contains("no merge-safety claim is available"));
+    assert!(report.contains("inspect source coverage"));
+    assert!(report.contains("Review-input coverage: PARTIAL"));
+    assert!(report.contains("Failure reason: gh_not_authenticated"));
     assert!(!report.contains("no current merge blocker was extracted"));
     assert!(!report.contains("continue normal PR follow-up"));
 }
@@ -282,15 +295,67 @@ fn report_surfaces_changes_requested_as_informational_context() {
             residual_blockers: 0,
         },
         None,
-        None,
-        Some(&gate),
-        None,
-        Some("# Escalation\n\nNo ADR/RFC candidates were found."),
+        ReportInputs {
+            source_coverage: Some(&full_source_coverage()),
+            gate: Some(&gate),
+            escalation_markdown: Some("# Escalation\n\nNo ADR/RFC candidates were found."),
+            ..Default::default()
+        },
     );
 
     assert!(report.contains("REVIEW_DECISIONS: CHANGES_REQUESTED (informational only)"));
     assert!(report.contains("GitHub still shows changes requested"));
     assert!(report.contains("Align the remaining CHANGES_REQUESTED state"));
+}
+
+#[test]
+fn report_names_missing_source_coverage_artifact_without_hiding_other_sections() {
+    let report = build_report_markdown(
+        ReportHeader {
+            run_status: Status::Partial,
+            data_coverage: DataCoverage::Partial,
+            review_signal: ReviewSignal::Unknown,
+            residual_blockers: 0,
+        },
+        Some("source coverage missing"),
+        ReportInputs {
+            scan: Some(&ScanArtifact {
+                status: Status::Partial,
+                data_coverage: DataCoverage::Partial,
+                review_signal: ReviewSignal::Unknown,
+                reason: Some(String::from("source coverage missing")),
+                scan_partial: true,
+                repo_root: Some(String::from("/tmp/review-firewall")),
+                branch: Some(String::from("feature/test")),
+                pr: Default::default(),
+                files_changed: 0,
+                review_comments: 0,
+                threads: 0,
+                codeowners_found: false,
+                policy_found: false,
+                product_boundary: Default::default(),
+                changed_files: Vec::new(),
+                comments: Vec::new(),
+                issue_comments: Vec::new(),
+                review_threads: Vec::new(),
+                partial_sources: vec![String::from("pr_metadata"), String::from("review_comments")],
+                warnings: Vec::new(),
+            }),
+            source_coverage_notice: Some(
+                "source_coverage.json not found; run review-firewall scan first",
+            ),
+            gate: Some(&non_authoritative_gate(
+                Status::Partial,
+                "review comments were partially unavailable",
+            )),
+            escalation_markdown: Some("# Escalation\n\nNo ADR/RFC candidates were found."),
+            ..Default::default()
+        },
+    );
+
+    assert!(report.contains("## Source coverage"));
+    assert!(report.contains("Incomplete required sources: 2"));
+    assert!(report.contains("source_coverage.json not found; run review-firewall scan first"));
 }
 
 fn non_authoritative_gate(status: Status, reason: &str) -> GateArtifact {
@@ -330,6 +395,80 @@ fn empty_gate() -> GateArtifact {
         review_decision_summary: None,
         classified_comments: Vec::new(),
         escalation_candidates: Vec::new(),
+    }
+}
+
+fn full_source_coverage() -> SourceCoverageArtifact {
+    SourceCoverageArtifact {
+        status: Status::Ok,
+        data_coverage: DataCoverage::Full,
+        review_signal: ReviewSignal::Unknown,
+        reason: None,
+        sources: vec![
+            SourceCoverageEntry::new(
+                SourceCoverageName::PrMetadata,
+                true,
+                SourceCoverageStatus::Full,
+                1,
+                None,
+                None,
+            ),
+            SourceCoverageEntry::new(
+                SourceCoverageName::ChangedFiles,
+                true,
+                SourceCoverageStatus::Full,
+                3,
+                None,
+                None,
+            ),
+            SourceCoverageEntry::new(
+                SourceCoverageName::ReviewComments,
+                true,
+                SourceCoverageStatus::Full,
+                8,
+                None,
+                None,
+            ),
+            SourceCoverageEntry::new(
+                SourceCoverageName::IssueComments,
+                true,
+                SourceCoverageStatus::Full,
+                2,
+                None,
+                None,
+            ),
+        ],
+        warnings: Vec::new(),
+    }
+}
+
+fn partial_source_coverage() -> SourceCoverageArtifact {
+    SourceCoverageArtifact {
+        status: Status::Partial,
+        data_coverage: DataCoverage::Partial,
+        review_signal: ReviewSignal::Unknown,
+        reason: Some(String::from("review comments were partially unavailable")),
+        sources: vec![
+            SourceCoverageEntry::new(
+                SourceCoverageName::PrMetadata,
+                true,
+                SourceCoverageStatus::Full,
+                1,
+                None,
+                None,
+            ),
+            SourceCoverageEntry::new(
+                SourceCoverageName::ReviewComments,
+                true,
+                SourceCoverageStatus::Partial,
+                42,
+                Some(SourceFailureReason::GhNotAuthenticated),
+                Some(String::from(
+                    "GitHub CLI could not authenticate while fetching review comments.",
+                )),
+            ),
+        ],
+        warnings: Vec::new(),
     }
 }
 
