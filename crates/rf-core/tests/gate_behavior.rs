@@ -185,6 +185,29 @@ fn metalinguistic_failure_mode_docs_fail_to_explain_stays_non_runtime() {
 }
 
 #[test]
+fn metalinguistic_failure_mode_docs_fail_to_explain_stays_non_runtime_when_relaxed() {
+    let scan =
+        base_scan("The failure-mode extractor docs fail to explain the narrower wording here.");
+    let config = GateConfigSnapshot {
+        require_failure_mode: false,
+        require_evidence: false,
+        ..GateConfigSnapshot::default()
+    };
+
+    let gate = gate_scan(&scan, &config, &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert_ne!(comment.comment_type, rf_core::domain::CommentType::Blocker);
+    assert_eq!(comment.concern, None);
+    assert_eq!(comment.failure_mode, None);
+    assert!(!comment.present_pr_impact);
+    assert!(gate.residual_blockers.is_empty());
+}
+
+#[test]
 fn metalinguistic_comment_with_runtime_crash_still_extracts_failure_mode() {
     let scan = base_scan(
         "The failure-mode extractor documentation is wrong because it crashes on empty threads.",
@@ -243,6 +266,29 @@ fn metalinguistic_comment_with_plain_runtime_fails_still_extracts_failure_mode()
             .as_deref()
             .is_some_and(|value| value.contains("it fails after retries")),
         "plain runtime fail verbs should survive even when wording/docs are mentioned"
+    );
+}
+
+#[test]
+fn metalinguistic_comment_with_plain_runtime_fails_and_repro_still_blocks() {
+    let scan = base_scan(
+        "The failure-mode extractor docs are wrong in this PR because it fails after retries when the same request is replayed under the retry loop.",
+    );
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let blocker = gate.residual_blockers.first().expect("residual blocker");
+    assert_eq!(blocker.evidence_class, EvidenceClass::ReproCondition);
+    assert!(
+        blocker.failure_mode.contains("fails after retries"),
+        "plain runtime fail verbs should still reach author-facing blockers when repro evidence is present"
+    );
+    assert!(
+        blocker
+            .evidence
+            .iter()
+            .any(|value| value.contains("when the same request is replayed")),
+        "repro evidence should survive alongside recovered plain-fail failure modes"
     );
 }
 
