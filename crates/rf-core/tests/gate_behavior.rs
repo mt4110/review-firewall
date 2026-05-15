@@ -289,6 +289,25 @@ fn metalinguistic_comment_with_runtime_failure_to_still_extracts_failure_mode() 
 }
 
 #[test]
+fn metalinguistic_comment_with_runtime_causes_failure_still_extracts_failure_mode() {
+    let scan = base_scan("The failure-mode extractor docs are wrong because it causes failure.");
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert!(
+        comment
+            .failure_mode
+            .as_deref()
+            .is_some_and(|value| value.contains("causes failure")),
+        "runtime causes-failure details should survive even when wording/docs are mentioned"
+    );
+}
+
+#[test]
 fn metalinguistic_comment_with_incorrect_output_still_extracts_failure_mode() {
     let scan = base_scan(
         "The failure-mode extractor docs are wrong because the classification output is incorrect for clean runs.",
@@ -306,6 +325,25 @@ fn metalinguistic_comment_with_incorrect_output_still_extracts_failure_mode() {
             .as_deref()
             .is_some_and(|value| value.contains("classification output is incorrect")),
         "runtime incorrect-output details should survive even when wording/docs are mentioned"
+    );
+}
+
+#[test]
+fn runtime_causes_failure_still_extracts_failure_mode() {
+    let scan = base_scan("This change causes failure when rollback metadata is missing.");
+
+    let gate = gate_scan(&scan, &GateConfigSnapshot::default(), &[]);
+
+    let comment = gate
+        .classified_comments
+        .first()
+        .expect("classified comment");
+    assert!(
+        comment
+            .failure_mode
+            .as_deref()
+            .is_some_and(|value| value.contains("causes failure")),
+        "runtime causes-failure phrasing should remain a failure-mode signal"
     );
 }
 
