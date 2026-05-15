@@ -379,6 +379,20 @@ fn public_demo_numbers_are_synchronized() {
 }
 
 #[test]
+fn deferred_doc_records_evidence_follow_on_as_handled() {
+    assert!(DEFERRED_DOC.contains("failure-mode extractor"));
+    assert!(DEFERRED_DOC.contains("failure-mode matching"));
+    assert!(DEFERRED_DOC.contains("no longer part of the current deferred set"));
+    assert!(!DEFERRED_DOC.contains("## Evidence extraction follow-on heuristics"));
+    assert!(DEFERRED_DOC.contains("## Human-recorded validation rates"));
+    assert!(FREEZE_AUDIT_DOC.contains("[x] evidence extraction judged strict enough"));
+    assert!(
+        !FREEZE_AUDIT_DOC.contains("Further evidence extraction tightening."),
+        "freeze audit should not keep evidence extraction in the current deliberate deferrals"
+    );
+}
+
+#[test]
 fn checked_in_demo_json_matches_published_schemas() {
     let scan_schema: Value = serde_json::from_str(SCAN_SCHEMA).expect("scan schema json");
     let gate_schema: Value = serde_json::from_str(GATE_SCHEMA).expect("gate schema json");

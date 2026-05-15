@@ -13,6 +13,8 @@ const TRUE_BLOCKER_NATURAL_FIXTURES: &str =
     include_str!("../../../fixtures/reviews/true_blockers_natural_ja.yaml");
 const CONCERN_FALSE_POSITIVE_FIXTURES: &str =
     include_str!("../../../fixtures/reviews/concern_false_positives_ja.yaml");
+const FAILURE_MODE_FALSE_POSITIVE_FIXTURES: &str =
+    include_str!("../../../fixtures/reviews/failure_mode_false_positives_ja.yaml");
 const NOISE_EXACT_FIXTURES: &str = include_str!("../../../fixtures/reviews/noise_exact_ja.yaml");
 
 #[derive(Debug, Deserialize)]
@@ -351,6 +353,91 @@ fn review_fixtures_concern_false_positive_cases_do_not_extract_concern() {
     assert!(
         failures.is_empty(),
         "concern false-positive fixtures failed:\n{}",
+        failures.join("\n\n")
+    );
+}
+
+#[test]
+fn review_fixtures_failure_mode_false_positive_cases_do_not_extract_failure_mode() {
+    let fixtures = load_fixture_file(FAILURE_MODE_FALSE_POSITIVE_FIXTURES);
+    assert_eq!(fixtures.version, 1, "unexpected fixture version");
+    assert_eq!(fixtures.language, "ja", "unexpected fixture language");
+    assert!(
+        fixtures.kind.contains("failure_mode_false_positive"),
+        "unexpected fixture kind: {}",
+        fixtures.kind
+    );
+    assert!(
+        !fixtures.notes.is_empty(),
+        "failure-mode false-positive fixture file should carry notes"
+    );
+
+    let mut failures = Vec::new();
+    for case in &fixtures.cases {
+        assert!(
+            !case.expected.blocker,
+            "failure-mode false-positive fixture {} is malformed: expected.blocker must be false",
+            case.id
+        );
+
+        let gate = gate_scan(
+            &synthetic_scan(&case.id, &case.comment_ja),
+            &GateConfigSnapshot::default(),
+            &[],
+        );
+        let actual = gate
+            .classified_comments
+            .first()
+            .expect("classified fixture comment");
+
+        if !gate.residual_blockers.is_empty() || actual.comment_type == CommentType::Blocker {
+            failures.push(format!(
+                "{} ({}) became blocking\nexpected_type={:?} actual_type={:?} actual_failure_mode={:?}\ncomment={}",
+                case.id,
+                case.category,
+                case.expected.comment_type,
+                actual.comment_type,
+                actual.failure_mode,
+                case.comment_ja
+            ));
+        }
+        if actual.comment_type != case.expected.comment_type {
+            failures.push(format!(
+                "{} ({}) changed non-blocking classification\nexpected_type={:?} actual_type={:?} actual_failure_mode={:?}\ncomment={}",
+                case.id,
+                case.category,
+                case.expected.comment_type,
+                actual.comment_type,
+                actual.failure_mode,
+                case.comment_ja
+            ));
+        }
+        if actual.failure_mode.is_some() {
+            failures.push(format!(
+                "{} ({}) extracted a metalinguistic failure mode\nactual_type={:?} actual_failure_mode={:?}\ncomment={}",
+                case.id,
+                case.category,
+                actual.comment_type,
+                actual.failure_mode,
+                case.comment_ja
+            ));
+        }
+        if actual.concern.is_some() {
+            failures.push(format!(
+                "{} ({}) extracted unexpected concern\nactual_type={:?} actual_concern={:?} actual_failure_mode={:?}\ncomment={}",
+                case.id,
+                case.category,
+                actual.comment_type,
+                actual.concern,
+                actual.failure_mode,
+                case.comment_ja
+            ));
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "failure-mode false-positive fixtures failed:\n{}",
         failures.join("\n\n")
     );
 }

@@ -2,11 +2,11 @@
 
 These items were reviewed during the Phase 6 freeze audit and are intentionally left out of the v0.1 freeze scope.
 
-## Evidence extraction follow-on heuristics
+Historical note:
 
-- Current status: broad contract wording without a concrete delta or reference is now rejected from authoritative blocker evidence, and the boundary is covered by tests.
-- Why deferred: this pass did not add new fixture-backed false-positive/false-negative evidence strong enough to widen the heuristic boundary without guesswork.
-- Follow-up direction: extend fixtures first, then add only the next deterministic evidence rules that measurably improve trust.
+- The narrow evidence follow-on from the design docs is no longer part of the current deferred set.
+- The checked-in demo had already captured a traceable metalinguistic false-positive family around `failure-mode extractor` / `failure-mode matching` wording.
+- That narrow deterministic follow-up is now handled in code and tests without widening v0.1 scope beyond the existing evidence-hardening contract.
 
 ## Human-recorded validation rates
 
