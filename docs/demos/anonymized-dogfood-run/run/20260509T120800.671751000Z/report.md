@@ -31,3 +31,17 @@ Action: decide whether to fix in this PR or move the broader design issue out of
 2. Address blocker #demo-r002: Badge fragments should be stripped before failure-mode matching or noise can survive into blocker summaries.
 3. Address blocker #demo-r003: GitHub metadata fetch failures should degrade data coverage to PARTIAL instead of sounding like fatal review truth.
 4. Use the accept reply draft: Thanks. I agree this is an API contract issue in this PR. / I will merge report status across downstream artifacts before asking for re-review.
+
+## Source coverage
+Review-input coverage: FULL
+Incomplete required sources: 0
+- Repo root: FULL (required, 1 seen)
+- Current branch: FULL (optional, 1 seen)
+- Config: FULL (optional, 1 seen)
+- CODEOWNERS: FULL (optional, 1 seen)
+- PR metadata: FULL (required, 1 seen)
+- Changed files: FULL (required, 76 seen)
+- Review comments: FULL (required, 223 seen)
+- Review body comments: FULL (required, 51 seen)
+- Issue comments: FULL (required, 123 seen)
+- Review decision: FULL (optional, 1 seen)

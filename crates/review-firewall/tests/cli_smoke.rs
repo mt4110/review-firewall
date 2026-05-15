@@ -328,6 +328,9 @@ fn smoke_flow_creates_all_artifacts() {
     assert!(gate.contains(r#""review_decision_summary""#));
     assert!(escalation.contains("No ADR/RFC candidates were found."));
     assert!(report.contains("REVIEW_DECISIONS: CHANGES_REQUESTED (informational only)"));
+    assert!(report.contains("## Source coverage"));
+    assert!(report.contains("Review-input coverage: FULL"));
+    assert!(report.contains("- PR metadata: FULL (required, 1 seen)"));
 }
 
 #[test]
@@ -648,6 +651,79 @@ fn report_writes_error_artifact_for_unreadable_upstream_artifact() {
 }
 
 #[test]
+fn report_marks_missing_source_coverage_artifact_as_partial() {
+    let repo = temp_dir("report-missing-source-coverage");
+    init_repo(&repo);
+    let gh_stub = install_gh_success_stub(&repo);
+
+    for args in [
+        vec!["scan", "--pr", "42"],
+        vec!["gate"],
+        vec!["draft-reply"],
+        vec!["escalate"],
+    ] {
+        let output = run_with_path(&repo, &gh_stub, &args);
+        assert!(
+            output.status.success(),
+            "command failed: {:?}\nstdout={}\nstderr={}",
+            args,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let run_dir = latest_run_dir(&repo);
+    fs::remove_file(run_dir.join("source_coverage.json")).expect("remove source coverage");
+
+    let report = run_with_path(&repo, &gh_stub, &["report"]);
+
+    assert!(report.status.success());
+    let stdout = String::from_utf8_lossy(&report.stdout);
+    assert!(stdout.contains("STATUS: PARTIAL"));
+    assert!(stdout.contains("source_coverage.json not found; run review-firewall scan first"));
+    let report_md = fs::read_to_string(run_dir.join("report.md")).expect("report");
+    assert!(report_md.contains("STATUS: PARTIAL"));
+    assert!(report_md.contains("source_coverage.json not found; run review-firewall scan first"));
+}
+
+#[test]
+fn report_marks_unreadable_source_coverage_artifact_as_error() {
+    let repo = temp_dir("report-corrupt-source-coverage");
+    init_repo(&repo);
+    let gh_stub = install_gh_success_stub(&repo);
+
+    for args in [
+        vec!["scan", "--pr", "42"],
+        vec!["gate"],
+        vec!["draft-reply"],
+        vec!["escalate"],
+    ] {
+        let output = run_with_path(&repo, &gh_stub, &args);
+        assert!(
+            output.status.success(),
+            "command failed: {:?}\nstdout={}\nstderr={}",
+            args,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let run_dir = latest_run_dir(&repo);
+    fs::write(run_dir.join("source_coverage.json"), "{ not json\n")
+        .expect("corrupt source coverage");
+
+    let report = run_with_path(&repo, &gh_stub, &["report"]);
+
+    assert!(report.status.success());
+    let stdout = String::from_utf8_lossy(&report.stdout);
+    assert!(stdout.contains("STATUS: ERROR"));
+    assert!(stdout.contains("source_coverage.json could not be read"));
+    let report_md = fs::read_to_string(run_dir.join("report.md")).expect("report");
+    assert!(report_md.contains("STATUS: ERROR"));
+    assert!(report_md.contains("source_coverage.json could not be read"));
+}
+
+#[test]
 fn config_partial_status_reaches_reply_and_escalation_commands() {
     let repo = temp_dir("smoke-config-partial");
     init_repo(&repo);
@@ -755,6 +831,8 @@ fn stopless_partial_path_still_writes_artifacts() {
     assert!(scan.contains("src/local_only.rs"));
     assert!(scan.contains("src/scratch.rs"));
     assert!(report.contains("STATUS: PARTIAL"));
+    assert!(report.contains("## Source coverage"));
+    assert!(report.contains("Review-input coverage: FAILED"));
 }
 
 fn run(command: &mut Command) {

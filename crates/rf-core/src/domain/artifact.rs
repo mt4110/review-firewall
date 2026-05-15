@@ -144,6 +144,23 @@ pub enum SourceFailureReason {
 }
 
 impl SourceFailureReason {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::GhMissing => "gh_missing",
+            Self::GhNotAuthenticated => "gh_not_authenticated",
+            Self::GhRateLimited => "gh_rate_limited",
+            Self::GhPermissionDenied => "gh_permission_denied",
+            Self::PrNotFound => "pr_not_found",
+            Self::RepositoryIdentityUnknown => "repository_identity_unknown",
+            Self::PaginationPartial => "pagination_partial",
+            Self::JsonParseError => "json_parse_error",
+            Self::NetworkError => "network_error",
+            Self::LocalGitUnavailable => "local_git_unavailable",
+            Self::HeadOidMismatch => "head_oid_mismatch",
+            Self::UnsupportedRemote => "unsupported_remote",
+        }
+    }
+
     pub const fn retry_hint(self) -> &'static str {
         match self {
             Self::GhMissing => "Install GitHub CLI (`gh`) and rerun review-firewall scan.",
