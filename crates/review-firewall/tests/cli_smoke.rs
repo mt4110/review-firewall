@@ -739,10 +739,18 @@ fn stopless_partial_path_still_writes_artifacts() {
     let source_coverage =
         fs::read_to_string(run_dir.join("source_coverage.json")).expect("source coverage");
     let report = fs::read_to_string(run_dir.join("report.md")).expect("report");
+    let source_coverage_json: serde_json::Value =
+        serde_json::from_str(&source_coverage).expect("source coverage json");
 
     assert!(scan.contains(r#""status": "PARTIAL""#));
     assert!(scan.contains("gh stub failure"));
-    assert!(source_coverage.contains(r#""source_coverage""#) || !source_coverage.is_empty());
+    assert!(
+        source_coverage_json
+            .get("sources")
+            .and_then(serde_json::Value::as_array)
+            .is_some(),
+        "source_coverage.json should contain a sources array"
+    );
     assert!(source_coverage.contains(r#""name": "pr_metadata""#));
     assert!(scan.contains("src/local_only.rs"));
     assert!(scan.contains("src/scratch.rs"));

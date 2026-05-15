@@ -160,8 +160,8 @@ Minimum shape:
 
 ```json
 {
-  "status": "OK",
-  "data_coverage": "FULL",
+  "status": "PARTIAL",
+  "data_coverage": "PARTIAL",
   "review_signal": "UNKNOWN",
   "sources": [
     {
@@ -207,7 +207,7 @@ Stable failure-reason values used by scan-time ingestion:
 
 `data_coverage` is derived only from required sources:
 
-- any required `FAILED` source => `FAILED`
+- any required `FAILED` or `SKIPPED` source => `FAILED`
 - else any required `PARTIAL` source => `PARTIAL`
 - else => `FULL`
 

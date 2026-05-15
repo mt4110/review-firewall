@@ -1139,11 +1139,26 @@ fn coverage_status_for_observed_items(items_seen: usize) -> SourceCoverageStatus
 }
 
 fn normalize_repository_identity_failure(detail: &str) -> SourceFailureReason {
-    if detail.trim().contains("No git remotes configured") {
+    let detail = detail.trim();
+    let lower = detail.to_ascii_lowercase();
+
+    if detail.contains("No git remotes configured") {
         SourceFailureReason::RepositoryIdentityUnknown
+    } else if lower.contains("not a git repository")
+        || lower.contains("git remote lookup failed")
+        || lower.contains("no such file or directory")
+        || lower.contains("program not found")
+    {
+        SourceFailureReason::LocalGitUnavailable
     } else {
         SourceFailureReason::UnsupportedRemote
     }
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn normalize_repository_identity_failure_for_tests(detail: &str) -> SourceFailureReason {
+    normalize_repository_identity_failure(detail)
 }
 
 fn non_empty_base_branch(value: &str) -> Option<&str> {

@@ -896,6 +896,34 @@ fn gh_failure_normalization_maps_expected_reason_classes() {
         adapter::gh::normalize_gh_failure_for_tests("No such file or directory (os error 2)"),
         Some(SourceFailureReason::GhMissing)
     );
+    assert_eq!(
+        adapter::gh::normalize_gh_failure_for_tests("Bad credentials"),
+        Some(SourceFailureReason::GhNotAuthenticated)
+    );
+    assert_eq!(
+        adapter::gh::normalize_gh_failure_for_tests("HTTP 401: requires authentication"),
+        Some(SourceFailureReason::GhNotAuthenticated)
+    );
+}
+
+#[test]
+fn scan_repository_identity_failure_normalization_distinguishes_local_git_from_remote_shape() {
+    assert_eq!(
+        command::scan::normalize_repository_identity_failure_for_tests("No git remotes configured"),
+        SourceFailureReason::RepositoryIdentityUnknown
+    );
+    assert_eq!(
+        command::scan::normalize_repository_identity_failure_for_tests(
+            "Could not parse GitHub repository identity from git remotes"
+        ),
+        SourceFailureReason::UnsupportedRemote
+    );
+    assert_eq!(
+        command::scan::normalize_repository_identity_failure_for_tests(
+            "fatal: not a git repository (or any of the parent directories): .git"
+        ),
+        SourceFailureReason::LocalGitUnavailable
+    );
 }
 
 #[test]

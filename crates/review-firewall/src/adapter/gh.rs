@@ -249,6 +249,11 @@ fn normalize_gh_failure(detail: &str) -> Option<SourceFailureReason> {
         || lower.contains("authentication failed")
         || lower.contains("no oauth token")
         || lower.contains("token is required")
+        || lower.contains("bad credentials")
+        || lower.contains("http 401")
+        || lower.contains("status code 401")
+        || lower.contains("401 unauthorized")
+        || lower.contains("requires authentication")
     {
         return Some(SourceFailureReason::GhNotAuthenticated);
     }
