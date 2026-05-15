@@ -47,6 +47,7 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
     );
     let input_problems = [
         scan.problem.clone(),
+        source_coverage.problem.clone(),
         gate.problem.clone(),
         draft.problem.clone(),
         escalation.problem.clone(),
@@ -57,6 +58,7 @@ pub fn run(cwd: &Path) -> Result<CommandOutcome, String> {
 
     let summary = report_summary(
         scan.value.as_ref(),
+        source_coverage.value.as_ref(),
         gate.value.as_ref(),
         draft.value.as_ref(),
         escalation.value.as_deref(),
@@ -245,6 +247,7 @@ pub fn count_author_actions_for_tests(markdown: &str) -> usize {
 
 fn report_summary(
     scan: Option<&ScanArtifact>,
+    source_coverage: Option<&SourceCoverageArtifact>,
     gate: Option<&GateArtifact>,
     draft: Option<&DraftReplyArtifact>,
     escalation: Option<&str>,
@@ -263,6 +266,9 @@ fn report_summary(
     let mut status = scan
         .map(|artifact| artifact.status)
         .unwrap_or(Status::Error);
+    if let Some(source_coverage) = source_coverage {
+        status = status.merge(source_coverage.status);
+    }
     if let Some(gate) = gate {
         status = status.merge(gate.status);
     }
@@ -294,6 +300,7 @@ fn report_summary(
         .or_else(|| draft.and_then(|artifact| artifact.reason.clone()))
         .or_else(|| escalation_reason.clone())
         .or_else(|| scan.and_then(|artifact| artifact.reason.clone()))
+        .or_else(|| source_coverage.and_then(|artifact| artifact.reason.clone()))
         .or_else(|| input_problems.first().map(|problem| problem.reason.clone()));
 
     ReportSummary {
@@ -308,11 +315,12 @@ fn report_summary(
 #[allow(dead_code)]
 pub fn report_status_and_reason_for_tests(
     scan: Option<&ScanArtifact>,
+    source_coverage: Option<&SourceCoverageArtifact>,
     gate: Option<&GateArtifact>,
     draft: Option<&DraftReplyArtifact>,
     escalation: Option<&str>,
 ) -> (Status, DataCoverage, ReviewSignal, Option<String>) {
-    let summary = report_summary(scan, gate, draft, escalation, &[]);
+    let summary = report_summary(scan, source_coverage, gate, draft, escalation, &[]);
     (
         summary.status,
         summary.data_coverage,
