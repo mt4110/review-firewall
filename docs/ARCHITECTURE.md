@@ -155,6 +155,17 @@ Forbidden:
 
 `data_coverage` tracks whether review inputs were fully observed.
 It must not be downgraded just because config parsing or CODEOWNERS advisory loading was partial.
+It is derived from the required entries in `source_coverage.json`.
+
+### Source coverage
+
+- `FULL`
+- `PARTIAL`
+- `FAILED`
+- `SKIPPED`
+
+`source_coverage` records per-source observation state for scan-time local and GitHub inputs.
+Required review sources drive `data_coverage`; optional advisory sources may be partial without changing review truth.
 
 ### Review signal
 
@@ -248,6 +259,7 @@ This avoids mixing unrelated PR-level conversations into one escalation signal w
 Output:
 
 - `scan.json`
+- `source_coverage.json`
 - stdout summary
 
 The command summary must expose:
@@ -371,6 +383,7 @@ Config flags must not be decorative.
     latest.json
     20260328T203500Z/
       scan.json
+      source_coverage.json
       gate.json
       draft_reply.json
       draft_reply.md

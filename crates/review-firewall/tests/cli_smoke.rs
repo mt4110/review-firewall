@@ -306,6 +306,7 @@ fn smoke_flow_creates_all_artifacts() {
 
     for file in [
         "scan.json",
+        "source_coverage.json",
         "gate.json",
         "draft_reply.json",
         "draft_reply.md",
@@ -358,6 +359,8 @@ fn scan_preserves_review_body_threads_without_repository_identity() {
     assert!(stdout.contains("Threads: 2"));
     let run_dir = latest_run_dir(&repo);
     let scan_json = fs::read_to_string(run_dir.join("scan.json")).expect("scan");
+    let source_coverage =
+        fs::read_to_string(run_dir.join("source_coverage.json")).expect("source coverage");
     assert!(scan_json.contains(r#""files_changed": 1"#));
     assert!(!scan_json.contains(r#""src/local.rs""#));
     assert!(scan_json.contains(r#""review_comments": 1"#));
@@ -365,7 +368,9 @@ fn scan_preserves_review_body_threads_without_repository_identity() {
     assert!(scan_json.contains(r#""thread_id": "review:PRR_1""#));
     assert!(scan_json.contains(r#""thread_id": "issue:IC_1""#));
     assert!(scan_json.contains("Conversation tab blocker"));
-    assert!(scan_json.contains("repository_identity"));
+    assert!(source_coverage.contains(r#""name": "changed_files""#));
+    assert!(source_coverage.contains("repository_identity_unknown"));
+    assert!(source_coverage.contains(r#""data_coverage": "FAILED""#));
 }
 
 #[test]
@@ -731,10 +736,22 @@ fn stopless_partial_path_still_writes_artifacts() {
     let run_dir = repo.join(".review-firewall").join("run").join(timestamp);
 
     let scan = fs::read_to_string(run_dir.join("scan.json")).expect("scan");
+    let source_coverage =
+        fs::read_to_string(run_dir.join("source_coverage.json")).expect("source coverage");
     let report = fs::read_to_string(run_dir.join("report.md")).expect("report");
+    let source_coverage_json: serde_json::Value =
+        serde_json::from_str(&source_coverage).expect("source coverage json");
 
     assert!(scan.contains(r#""status": "PARTIAL""#));
     assert!(scan.contains("gh stub failure"));
+    assert!(
+        source_coverage_json
+            .get("sources")
+            .and_then(serde_json::Value::as_array)
+            .is_some(),
+        "source_coverage.json should contain a sources array"
+    );
+    assert!(source_coverage.contains(r#""name": "pr_metadata""#));
     assert!(scan.contains("src/local_only.rs"));
     assert!(scan.contains("src/scratch.rs"));
     assert!(report.contains("STATUS: PARTIAL"));

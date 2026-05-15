@@ -85,6 +85,172 @@ impl Default for ProductBoundarySnapshot {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceCoverageName {
+    RepoRoot,
+    CurrentBranch,
+    Config,
+    Codeowners,
+    PrMetadata,
+    ChangedFiles,
+    ReviewComments,
+    ReviewBodyComments,
+    IssueComments,
+    ReviewDecision,
+}
+
+impl SourceCoverageName {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::RepoRoot => "repo_root",
+            Self::CurrentBranch => "current_branch",
+            Self::Config => "config",
+            Self::Codeowners => "codeowners",
+            Self::PrMetadata => "pr_metadata",
+            Self::ChangedFiles => "changed_files",
+            Self::ReviewComments => "review_comments",
+            Self::ReviewBodyComments => "review_body_comments",
+            Self::IssueComments => "issue_comments",
+            Self::ReviewDecision => "review_decision",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum SourceCoverageStatus {
+    Full,
+    Partial,
+    Failed,
+    Skipped,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceFailureReason {
+    GhMissing,
+    GhNotAuthenticated,
+    GhRateLimited,
+    GhPermissionDenied,
+    PrNotFound,
+    RepositoryIdentityUnknown,
+    PaginationPartial,
+    JsonParseError,
+    NetworkError,
+    LocalGitUnavailable,
+    HeadOidMismatch,
+    UnsupportedRemote,
+}
+
+impl SourceFailureReason {
+    pub const fn retry_hint(self) -> &'static str {
+        match self {
+            Self::GhMissing => "Install GitHub CLI (`gh`) and rerun review-firewall scan.",
+            Self::GhNotAuthenticated => {
+                "Run `gh auth login` or refresh authentication, then rerun review-firewall scan."
+            }
+            Self::GhRateLimited => {
+                "Wait for the GitHub rate limit reset, then rerun review-firewall scan."
+            }
+            Self::GhPermissionDenied => {
+                "Confirm the current GitHub account can read this repository and PR, then rerun review-firewall scan."
+            }
+            Self::PrNotFound => {
+                "Confirm the PR exists or rerun with `review-firewall scan --pr <number>`."
+            }
+            Self::RepositoryIdentityUnknown => {
+                "Set a readable GitHub remote or rerun from the PR checkout."
+            }
+            Self::PaginationPartial => {
+                "Rerun review-firewall scan after checking gh auth, rate limits, or connectivity."
+            }
+            Self::JsonParseError => {
+                "Rerun review-firewall scan and inspect the gh output for unexpected formatting."
+            }
+            Self::NetworkError => "Check network connectivity and rerun review-firewall scan.",
+            Self::LocalGitUnavailable => {
+                "Check local git access and rerun review-firewall scan inside the repository."
+            }
+            Self::HeadOidMismatch => {
+                "Checkout the PR head commit or push local commits before relying on local git supplementation."
+            }
+            Self::UnsupportedRemote => {
+                "Use a GitHub or GitHub Enterprise remote that gh can address, then rerun review-firewall scan."
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceCoverageEntry {
+    pub name: SourceCoverageName,
+    pub required: bool,
+    pub status: SourceCoverageStatus,
+    pub items_seen: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failure_reason: Option<SourceFailureReason>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_hint: Option<String>,
+}
+
+impl SourceCoverageEntry {
+    pub fn new(
+        name: SourceCoverageName,
+        required: bool,
+        status: SourceCoverageStatus,
+        items_seen: usize,
+        failure_reason: Option<SourceFailureReason>,
+        detail: Option<String>,
+    ) -> Self {
+        let retry_hint = failure_reason.map(|reason| reason.retry_hint().to_owned());
+        Self {
+            name,
+            required,
+            status,
+            items_seen,
+            failure_reason,
+            detail,
+            retry_hint,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceCoverageArtifact {
+    pub status: Status,
+    pub data_coverage: DataCoverage,
+    pub review_signal: ReviewSignal,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    pub sources: Vec<SourceCoverageEntry>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
+}
+
+pub fn derive_data_coverage_from_sources(sources: &[SourceCoverageEntry]) -> DataCoverage {
+    if sources.iter().any(|source| {
+        source.required
+            && matches!(
+                source.status,
+                SourceCoverageStatus::Failed | SourceCoverageStatus::Skipped
+            )
+    }) {
+        return DataCoverage::Failed;
+    }
+
+    if sources
+        .iter()
+        .any(|source| source.required && source.status == SourceCoverageStatus::Partial)
+    {
+        DataCoverage::Partial
+    } else {
+        DataCoverage::Full
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ScanArtifact {
     pub status: Status,

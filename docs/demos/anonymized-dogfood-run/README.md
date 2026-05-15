@@ -12,6 +12,7 @@ run/
   latest.json
   20260509T120800.671751000Z/
     scan.json
+    source_coverage.json
     gate.json
     draft_reply.json
     draft_reply.md

@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use jsonschema::{meta, validator_for};
 use rf_core::domain::{
     DataCoverage, DraftReplyArtifact, GateArtifact, LatestPointer, ReviewSignal, ScanArtifact,
-    Status,
+    SourceCoverageArtifact, SourceCoverageName, Status,
 };
 use serde::Deserialize;
 use serde_json::Value;
@@ -15,6 +15,9 @@ const DEMO_SCAN: &str = include_str!(
 );
 const DEMO_GATE: &str = include_str!(
     "../../../docs/demos/anonymized-dogfood-run/run/20260509T120800.671751000Z/gate.json"
+);
+const DEMO_SOURCE_COVERAGE: &str = include_str!(
+    "../../../docs/demos/anonymized-dogfood-run/run/20260509T120800.671751000Z/source_coverage.json"
 );
 const DEMO_DRAFT_REPLY: &str = include_str!(
     "../../../docs/demos/anonymized-dogfood-run/run/20260509T120800.671751000Z/draft_reply.json"
@@ -35,6 +38,7 @@ const DEMO_README: &str = include_str!("../../../docs/demos/anonymized-dogfood-r
 const FREEZE_AUDIT_DOC: &str = include_str!("../../../docs/v0.1-freeze-audit.md");
 const SCAN_SCHEMA: &str = include_str!("../../../schemas/scan.schema.json");
 const GATE_SCHEMA: &str = include_str!("../../../schemas/gate.schema.json");
+const SOURCE_COVERAGE_SCHEMA: &str = include_str!("../../../schemas/source_coverage.schema.json");
 
 #[derive(Debug, Deserialize)]
 struct ManualLabelCorpus {
@@ -112,6 +116,8 @@ fn checked_in_demo_artifacts_follow_current_contract() {
     let latest: LatestPointer = serde_json::from_str(DEMO_LATEST).expect("demo latest pointer");
     let scan: ScanArtifact = serde_json::from_str(DEMO_SCAN).expect("demo scan artifact");
     let gate: GateArtifact = serde_json::from_str(DEMO_GATE).expect("demo gate artifact");
+    let source_coverage: SourceCoverageArtifact =
+        serde_json::from_str(DEMO_SOURCE_COVERAGE).expect("demo source coverage artifact");
     let draft: DraftReplyArtifact =
         serde_json::from_str(DEMO_DRAFT_REPLY).expect("demo draft reply artifact");
 
@@ -125,6 +131,15 @@ fn checked_in_demo_artifacts_follow_current_contract() {
     assert_eq!(scan.threads, 296);
     assert!(scan.codeowners_found);
     assert!(scan.policy_found);
+    assert_eq!(source_coverage.status, Status::Ok);
+    assert_eq!(source_coverage.data_coverage, DataCoverage::Full);
+    assert_eq!(source_coverage.review_signal, ReviewSignal::Unknown);
+    assert_eq!(source_coverage.sources.len(), 10);
+    assert!(source_coverage.sources.iter().any(|source| {
+        source.name == SourceCoverageName::ChangedFiles
+            && source.items_seen == 76
+            && source.required
+    }));
 
     assert_eq!(gate.status, Status::Ok);
     assert_eq!(gate.data_coverage, DataCoverage::Full);
@@ -396,8 +411,12 @@ fn deferred_doc_records_evidence_follow_on_as_handled() {
 fn checked_in_demo_json_matches_published_schemas() {
     let scan_schema: Value = serde_json::from_str(SCAN_SCHEMA).expect("scan schema json");
     let gate_schema: Value = serde_json::from_str(GATE_SCHEMA).expect("gate schema json");
+    let source_coverage_schema: Value =
+        serde_json::from_str(SOURCE_COVERAGE_SCHEMA).expect("source coverage schema json");
     let scan_instance: Value = serde_json::from_str(DEMO_SCAN).expect("demo scan instance");
     let gate_instance: Value = serde_json::from_str(DEMO_GATE).expect("demo gate instance");
+    let source_coverage_instance: Value =
+        serde_json::from_str(DEMO_SOURCE_COVERAGE).expect("demo source coverage instance");
 
     assert!(
         meta::is_valid(&scan_schema),
@@ -406,6 +425,10 @@ fn checked_in_demo_json_matches_published_schemas() {
     assert!(
         meta::is_valid(&gate_schema),
         "gate schema must be valid json schema"
+    );
+    assert!(
+        meta::is_valid(&source_coverage_schema),
+        "source coverage schema must be valid json schema"
     );
 
     validator_for(&scan_schema)
@@ -416,6 +439,10 @@ fn checked_in_demo_json_matches_published_schemas() {
         .expect("compile gate schema")
         .validate(&gate_instance)
         .expect("demo gate should validate against published schema");
+    validator_for(&source_coverage_schema)
+        .expect("compile source coverage schema")
+        .validate(&source_coverage_instance)
+        .expect("demo source coverage should validate against published schema");
 }
 
 fn demo_traceable_ids(gate: &GateArtifact) -> BTreeSet<&str> {

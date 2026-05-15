@@ -1,0 +1,67 @@
+{
+  "status": "OK",
+  "data_coverage": "FULL",
+  "review_signal": "UNKNOWN",
+  "sources": [
+    {
+      "name": "repo_root",
+      "required": true,
+      "status": "FULL",
+      "items_seen": 1
+    },
+    {
+      "name": "current_branch",
+      "required": false,
+      "status": "FULL",
+      "items_seen": 1
+    },
+    {
+      "name": "config",
+      "required": false,
+      "status": "FULL",
+      "items_seen": 1
+    },
+    {
+      "name": "codeowners",
+      "required": false,
+      "status": "FULL",
+      "items_seen": 1
+    },
+    {
+      "name": "pr_metadata",
+      "required": true,
+      "status": "FULL",
+      "items_seen": 1
+    },
+    {
+      "name": "changed_files",
+      "required": true,
+      "status": "FULL",
+      "items_seen": 76
+    },
+    {
+      "name": "review_comments",
+      "required": true,
+      "status": "FULL",
+      "items_seen": 223
+    },
+    {
+      "name": "review_body_comments",
+      "required": true,
+      "status": "FULL",
+      "items_seen": 51
+    },
+    {
+      "name": "issue_comments",
+      "required": true,
+      "status": "FULL",
+      "items_seen": 123
+    },
+    {
+      "name": "review_decision",
+      "required": false,
+      "status": "FULL",
+      "items_seen": 1
+    }
+  ]
+}

@@ -3,7 +3,8 @@ use std::path::Path;
 
 use rf_core::domain::{
     CommentRecord, CommentSource, DataCoverage, ProductBoundarySnapshot, PullRequestSummary,
-    ReviewSignal, ScanArtifact, Status,
+    ReviewSignal, ScanArtifact, SourceCoverageArtifact, SourceCoverageEntry, SourceCoverageName,
+    SourceCoverageStatus, SourceFailureReason, Status, derive_data_coverage_from_sources,
 };
 use rf_core::{build_conversation_threads_for_author, normalize_path};
 use serde_json::Value;
@@ -15,6 +16,7 @@ use crate::io::{artifacts, codeowners, config, run_store};
 struct BoolProbe {
     value: bool,
     reason: Option<String>,
+    failure_reason: Option<SourceFailureReason>,
 }
 
 pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, String> {
@@ -27,20 +29,19 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
     let mut status = Status::Ok;
     let mut reason = None::<String>;
     let mut warnings = Vec::new();
-    let mut partial_sources = Vec::new();
 
     merge_probe_reason(
         &mut status,
         &mut reason,
         &mut warnings,
-        repo_root.reason,
+        repo_root.reason.clone(),
         Status::Partial,
     );
     merge_probe_reason(
         &mut status,
         &mut reason,
         &mut warnings,
-        branch.reason,
+        branch.reason.clone(),
         Status::Partial,
     );
     merge_probe_reason(
@@ -58,20 +59,108 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
         Status::Partial,
     );
 
+    let repo_root_source = SourceCoverageEntry::new(
+        SourceCoverageName::RepoRoot,
+        true,
+        if repo_root.reason.is_some() {
+            SourceCoverageStatus::Partial
+        } else {
+            SourceCoverageStatus::Full
+        },
+        usize::from(repo_root.reason.is_none()),
+        repo_root
+            .reason
+            .as_ref()
+            .map(|_| SourceFailureReason::LocalGitUnavailable),
+        repo_root.reason.clone(),
+    );
+    let current_branch_source = SourceCoverageEntry::new(
+        SourceCoverageName::CurrentBranch,
+        false,
+        if branch.reason.is_some() {
+            SourceCoverageStatus::Partial
+        } else {
+            SourceCoverageStatus::Full
+        },
+        usize::from(branch.reason.is_none()),
+        branch
+            .reason
+            .as_ref()
+            .map(|_| SourceFailureReason::LocalGitUnavailable),
+        branch.reason.clone(),
+    );
+    let config_source = SourceCoverageEntry::new(
+        SourceCoverageName::Config,
+        false,
+        if policy.reason.is_some() {
+            SourceCoverageStatus::Partial
+        } else {
+            SourceCoverageStatus::Full
+        },
+        usize::from(policy.found),
+        None,
+        policy.reason.clone(),
+    );
+    let codeowners_source = SourceCoverageEntry::new(
+        SourceCoverageName::Codeowners,
+        false,
+        if codeowners_file.reason.is_some() {
+            SourceCoverageStatus::Partial
+        } else {
+            SourceCoverageStatus::Full
+        },
+        usize::from(codeowners_file.found),
+        None,
+        codeowners_file.reason.clone(),
+    );
+
     let pr_view = gh::pr_view(&repo_root.path, pr_override);
     let mut pr = PullRequestSummary::default();
     let mut changed_files;
     let mut comments = Vec::<CommentRecord>::new();
     let mut issue_comments = Vec::<CommentRecord>::new();
     let mut review_threads = Vec::new();
+    let pr_metadata_source;
+    let mut changed_files_source = skipped_source(SourceCoverageName::ChangedFiles, true);
+    let mut review_comments_source = skipped_source(SourceCoverageName::ReviewComments, true);
+    let review_body_comments_source;
+    let mut issue_comments_source = skipped_source(SourceCoverageName::IssueComments, true);
+    let review_decision_source;
 
     match pr_view {
         Ok(pr_data) => {
             pr = build_pull_request_summary(&pr_data);
             changed_files = pr_changed_files(&pr_data);
+            let pr_view_changed_files_seen = changed_files.len();
             comments = review_body_comment_records(&pr_data);
+            let review_body_comments_seen = comments.len();
             issue_comments = pr_view_issue_comment_records(&pr_data);
             normalize_issue_comment_thread_ids(&mut issue_comments);
+            let pr_view_issue_comments_seen = issue_comments.len();
+            pr_metadata_source = SourceCoverageEntry::new(
+                SourceCoverageName::PrMetadata,
+                true,
+                SourceCoverageStatus::Full,
+                1,
+                None,
+                None,
+            );
+            review_body_comments_source = SourceCoverageEntry::new(
+                SourceCoverageName::ReviewBodyComments,
+                true,
+                SourceCoverageStatus::Full,
+                review_body_comments_seen,
+                None,
+                None,
+            );
+            review_decision_source = SourceCoverageEntry::new(
+                SourceCoverageName::ReviewDecision,
+                false,
+                SourceCoverageStatus::Full,
+                pr.review_decisions.len(),
+                None,
+                None,
+            );
             let repository = repository_identity_from_pr_url(&pr_data)
                 .map(|identity| git::RepositoryProbe {
                     identity: Some(identity),
@@ -81,6 +170,10 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
 
             if let (Some(pr_number), Some(repository)) = (pr.number, repository.identity.clone()) {
                 let mut changed_files_partial = false;
+                let mut changed_files_failure = None::<(Option<SourceFailureReason>, String)>;
+                let mut changed_files_detail = None::<String>;
+                let mut used_local_changed_file_supplement = false;
+
                 match gh::changed_files(
                     &repo_root.path,
                     &repository.full_name,
@@ -90,44 +183,82 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     Ok(probe) => {
                         changed_files =
                             merge_changed_files(changed_files, &api_changed_files(&probe.values));
-                        if let Some(error) = probe.reason {
+                        if let Some(error) = probe.failure {
                             changed_files_partial = true;
-                            partial_sources.push(String::from("changed_files"));
                             merge_probe_reason(
                                 &mut status,
                                 &mut reason,
                                 &mut warnings,
-                                Some(error),
+                                Some(error.detail.clone()),
                                 Status::Partial,
                             );
+                            changed_files_failure = Some((error.reason, error.detail.clone()));
                         }
                     }
                     Err(error) => {
                         changed_files_partial = true;
-                        partial_sources.push(String::from("changed_files"));
                         merge_probe_reason(
                             &mut status,
                             &mut reason,
                             &mut warnings,
-                            Some(error),
+                            Some(error.detail.clone()),
                             Status::Partial,
                         );
+                        changed_files_failure = Some((error.reason, error.detail.clone()));
                     }
                 }
 
                 if changed_files.is_empty() || changed_files_partial {
-                    let base_paths = verified_base_changed_files(
+                    let supplement = verified_base_changed_files(
                         &repo_root.path,
                         pr.base_branch.as_deref(),
                         pr.head_oid.as_deref(),
-                        &mut status,
-                        &mut reason,
-                        &mut warnings,
-                        &mut partial_sources,
                     );
-                    changed_files = merge_changed_files(changed_files, &base_paths);
+                    if let Some(probe_reason) = supplement.reason.clone() {
+                        merge_probe_reason(
+                            &mut status,
+                            &mut reason,
+                            &mut warnings,
+                            Some(probe_reason.clone()),
+                            Status::Partial,
+                        );
+                        if changed_files_failure.is_none() {
+                            changed_files_failure =
+                                Some((supplement.failure_reason, probe_reason.clone()));
+                        }
+                    }
+                    used_local_changed_file_supplement = !supplement.paths.is_empty();
+                    changed_files = merge_changed_files(changed_files, &supplement.paths);
+                    if used_local_changed_file_supplement {
+                        changed_files_detail = Some(String::from(
+                            "Changed files were supplemented from a verified local base diff because GitHub coverage was incomplete.",
+                        ));
+                    }
                 }
+                let changed_files_status = if changed_files_failure.is_none()
+                    && !changed_files_partial
+                    && !used_local_changed_file_supplement
+                {
+                    SourceCoverageStatus::Full
+                } else {
+                    coverage_status_for_observed_items(changed_files.len())
+                };
+                let (changed_files_reason, changed_files_reason_detail) =
+                    changed_files_failure.unwrap_or((None, String::new()));
+                changed_files_source = SourceCoverageEntry::new(
+                    SourceCoverageName::ChangedFiles,
+                    true,
+                    changed_files_status,
+                    changed_files.len(),
+                    changed_files_reason,
+                    changed_files_detail.or_else(|| {
+                        (!changed_files_reason_detail.is_empty())
+                            .then_some(changed_files_reason_detail)
+                    }),
+                );
 
+                let mut line_review_comments_seen = 0usize;
+                let mut review_comments_failure = None::<(Option<SourceFailureReason>, String)>;
                 match gh::review_comments(
                     &repo_root.path,
                     &repository.full_name,
@@ -135,37 +266,59 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     pr_number,
                 ) {
                     Ok(probe) => {
-                        comments.extend(probe.values.iter().filter_map(review_comment_record).map(
-                            |mut comment| {
+                        let review_comment_records = probe
+                            .values
+                            .iter()
+                            .filter_map(review_comment_record)
+                            .map(|mut comment| {
                                 comment.path =
                                     comment.path.take().map(|value| normalize_path(&value));
                                 comment
-                            },
-                        ));
-                        if let Some(error) = probe.reason {
-                            partial_sources.push(String::from("review_comments"));
+                            })
+                            .collect::<Vec<_>>();
+                        line_review_comments_seen = review_comment_records.len();
+                        comments.extend(review_comment_records);
+                        if let Some(error) = probe.failure {
                             merge_probe_reason(
                                 &mut status,
                                 &mut reason,
                                 &mut warnings,
-                                Some(error),
+                                Some(error.detail.clone()),
                                 Status::Partial,
                             );
+                            review_comments_failure = Some((error.reason, error.detail.clone()));
                         }
                     }
                     Err(error) => {
-                        partial_sources.push(String::from("review_comments"));
                         merge_probe_reason(
                             &mut status,
                             &mut reason,
                             &mut warnings,
-                            Some(error),
+                            Some(error.detail.clone()),
                             Status::Partial,
                         );
+                        review_comments_failure = Some((error.reason, error.detail.clone()));
                     }
                 }
+                let review_comments_status = if review_comments_failure.is_none() {
+                    SourceCoverageStatus::Full
+                } else {
+                    coverage_status_for_observed_items(line_review_comments_seen)
+                };
+                let (review_comments_reason, review_comments_detail) =
+                    review_comments_failure.unwrap_or((None, String::new()));
+                review_comments_source = SourceCoverageEntry::new(
+                    SourceCoverageName::ReviewComments,
+                    true,
+                    review_comments_status,
+                    line_review_comments_seen,
+                    review_comments_reason,
+                    (!review_comments_detail.is_empty()).then_some(review_comments_detail),
+                );
                 normalize_review_comment_thread_ids(&mut comments);
 
+                let mut api_issue_comments_seen = 0usize;
+                let mut issue_comments_failure = None::<(Option<SourceFailureReason>, String)>;
                 match gh::issue_comments(
                     &repo_root.path,
                     &repository.full_name,
@@ -173,34 +326,56 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     pr_number,
                 ) {
                     Ok(probe) => {
-                        issue_comments = probe
+                        let api_issue_comments = probe
                             .values
                             .iter()
                             .filter_map(issue_comment_record)
-                            .collect();
+                            .collect::<Vec<_>>();
+                        api_issue_comments_seen = api_issue_comments.len();
+                        issue_comments = api_issue_comments;
                         normalize_issue_comment_thread_ids(&mut issue_comments);
-                        if let Some(error) = probe.reason {
-                            partial_sources.push(String::from("issue_comments"));
+                        if let Some(error) = probe.failure {
                             merge_probe_reason(
                                 &mut status,
                                 &mut reason,
                                 &mut warnings,
-                                Some(error),
+                                Some(error.detail.clone()),
                                 Status::Partial,
                             );
+                            issue_comments_failure = Some((error.reason, error.detail.clone()));
                         }
                     }
                     Err(error) => {
-                        partial_sources.push(String::from("issue_comments"));
                         merge_probe_reason(
                             &mut status,
                             &mut reason,
                             &mut warnings,
-                            Some(error),
+                            Some(error.detail.clone()),
                             Status::Partial,
                         );
+                        issue_comments_failure = Some((error.reason, error.detail.clone()));
                     }
                 }
+                let issue_comment_items_seen = if issue_comments_failure.is_some() {
+                    issue_comments.len().max(pr_view_issue_comments_seen)
+                } else {
+                    api_issue_comments_seen
+                };
+                let issue_comments_status = if issue_comments_failure.is_none() {
+                    SourceCoverageStatus::Full
+                } else {
+                    coverage_status_for_observed_items(issue_comment_items_seen)
+                };
+                let (issue_comments_reason, issue_comments_detail) =
+                    issue_comments_failure.unwrap_or((None, String::new()));
+                issue_comments_source = SourceCoverageEntry::new(
+                    SourceCoverageName::IssueComments,
+                    true,
+                    issue_comments_status,
+                    issue_comment_items_seen,
+                    issue_comments_reason,
+                    (!issue_comments_detail.is_empty()).then_some(issue_comments_detail),
+                );
 
                 review_threads = build_conversation_threads_for_author(
                     &comments,
@@ -208,29 +383,59 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                     Some(pr.author.as_str()),
                 );
             } else if pr.number.is_some() && repository.identity.is_none() {
+                let repository_reason = repository.reason.clone().unwrap_or_else(|| {
+                    String::from("Could not parse GitHub repository identity from git remotes")
+                });
+                let repository_failure_reason =
+                    Some(normalize_repository_identity_failure(&repository_reason));
+
                 if changed_files.is_empty() {
-                    let base_paths = verified_base_changed_files(
+                    let supplement = verified_base_changed_files(
                         &repo_root.path,
                         pr.base_branch.as_deref(),
                         pr.head_oid.as_deref(),
-                        &mut status,
-                        &mut reason,
-                        &mut warnings,
-                        &mut partial_sources,
                     );
-                    changed_files = merge_changed_files(changed_files, &base_paths);
+                    if let Some(probe_reason) = supplement.reason.clone() {
+                        merge_probe_reason(
+                            &mut status,
+                            &mut reason,
+                            &mut warnings,
+                            Some(probe_reason),
+                            Status::Partial,
+                        );
+                    }
+                    changed_files = merge_changed_files(changed_files, &supplement.paths);
                 }
-                partial_sources.push(String::from("repository_identity"));
                 merge_probe_reason(
                     &mut status,
                     &mut reason,
                     &mut warnings,
-                    repository.reason.clone().or_else(|| {
-                        Some(String::from(
-                            "Could not parse GitHub repository identity from git remotes",
-                        ))
-                    }),
+                    Some(repository_reason.clone()),
                     Status::Partial,
+                );
+                changed_files_source = SourceCoverageEntry::new(
+                    SourceCoverageName::ChangedFiles,
+                    true,
+                    coverage_status_for_observed_items(changed_files.len()),
+                    changed_files.len().max(pr_view_changed_files_seen),
+                    repository_failure_reason,
+                    Some(repository_reason.clone()),
+                );
+                review_comments_source = SourceCoverageEntry::new(
+                    SourceCoverageName::ReviewComments,
+                    true,
+                    SourceCoverageStatus::Failed,
+                    0,
+                    repository_failure_reason,
+                    Some(repository_reason.clone()),
+                );
+                issue_comments_source = SourceCoverageEntry::new(
+                    SourceCoverageName::IssueComments,
+                    true,
+                    coverage_status_for_observed_items(pr_view_issue_comments_seen),
+                    pr_view_issue_comments_seen,
+                    repository_failure_reason,
+                    Some(repository_reason),
                 );
             }
         }
@@ -239,7 +444,7 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                 &mut status,
                 &mut reason,
                 &mut warnings,
-                Some(error),
+                Some(error.detail.clone()),
                 Status::Partial,
             );
             let fallback_base_branch = git::fallback_base_branch(&repo_root.path);
@@ -260,7 +465,56 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
                 local_changed.reason,
                 Status::Partial,
             );
-            partial_sources.push(String::from("gh_pr_view"));
+            pr_metadata_source = SourceCoverageEntry::new(
+                SourceCoverageName::PrMetadata,
+                true,
+                SourceCoverageStatus::Failed,
+                0,
+                error.reason,
+                Some(error.detail.clone()),
+            );
+            review_body_comments_source = SourceCoverageEntry::new(
+                SourceCoverageName::ReviewBodyComments,
+                true,
+                SourceCoverageStatus::Failed,
+                0,
+                error.reason,
+                Some(error.detail.clone()),
+            );
+            review_comments_source = SourceCoverageEntry::new(
+                SourceCoverageName::ReviewComments,
+                true,
+                SourceCoverageStatus::Failed,
+                0,
+                error.reason,
+                Some(error.detail.clone()),
+            );
+            issue_comments_source = SourceCoverageEntry::new(
+                SourceCoverageName::IssueComments,
+                true,
+                SourceCoverageStatus::Failed,
+                0,
+                error.reason,
+                Some(error.detail.clone()),
+            );
+            review_decision_source = SourceCoverageEntry::new(
+                SourceCoverageName::ReviewDecision,
+                false,
+                SourceCoverageStatus::Failed,
+                0,
+                error.reason,
+                Some(error.detail.clone()),
+            );
+            changed_files_source = SourceCoverageEntry::new(
+                SourceCoverageName::ChangedFiles,
+                true,
+                coverage_status_for_observed_items(changed_files.len()),
+                changed_files.len(),
+                error.reason,
+                Some(String::from(
+                    "Changed files fell back to local git because PR metadata could not be fully observed from GitHub.",
+                )),
+            );
         }
     }
 
@@ -276,7 +530,32 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
         .into_iter()
         .map(|path| normalize_path(&path))
         .collect::<Vec<_>>();
-    let data_coverage = DataCoverage::from_partial_sources(!partial_sources.is_empty());
+    let sources = vec![
+        repo_root_source,
+        current_branch_source,
+        config_source,
+        codeowners_source,
+        pr_metadata_source,
+        changed_files_source,
+        review_comments_source,
+        review_body_comments_source,
+        issue_comments_source,
+        review_decision_source,
+    ];
+    let data_coverage = derive_data_coverage_from_sources(&sources);
+    let partial_sources = sources
+        .iter()
+        .filter(|source| source.required && source.status != SourceCoverageStatus::Full)
+        .map(|source| source.name.as_str().to_owned())
+        .collect::<Vec<_>>();
+    let source_coverage_artifact = SourceCoverageArtifact {
+        status,
+        data_coverage,
+        review_signal: ReviewSignal::Unknown,
+        reason: reason.clone(),
+        sources,
+        warnings: warnings.clone(),
+    };
 
     let artifact = ScanArtifact {
         status,
@@ -301,6 +580,11 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
         warnings,
     };
 
+    artifacts::write_json(
+        run.directory.join("source_coverage.json"),
+        &source_coverage_artifact,
+    )
+    .map_err(io_error)?;
     artifacts::write_json(run.directory.join("scan.json"), &artifact).map_err(io_error)?;
     run_store::write_latest(&run).map_err(io_error)?;
 
@@ -327,7 +611,7 @@ pub fn run(cwd: &Path, pr_override: Option<u64>) -> Result<CommandOutcome, Strin
         ],
         next: if artifact.data_coverage != DataCoverage::Full {
             Some(String::from(
-                "Inspect missing review inputs, then rerun review-firewall scan.",
+                "Inspect source_coverage.json for missing review inputs, then rerun review-firewall scan.",
             ))
         } else {
             artifact
@@ -523,34 +807,39 @@ fn supplement_changed_files_from_base_diff(
     }
 }
 
+struct ChangedFileSupplementProbe {
+    paths: Vec<String>,
+    reason: Option<String>,
+    failure_reason: Option<SourceFailureReason>,
+}
+
 fn verified_base_changed_files(
     repo_root: &Path,
     base_branch: Option<&str>,
     pr_head_oid: Option<&str>,
-    status: &mut Status,
-    reason: &mut Option<String>,
-    warnings: &mut Vec<String>,
-    partial_sources: &mut Vec<String>,
-) -> Vec<String> {
+) -> ChangedFileSupplementProbe {
     let head_check = local_head_matches_pr_head(repo_root, pr_head_oid);
-    if head_check.reason.is_some() {
-        partial_sources.push(String::from("changed_files"));
-    }
     let head_matches = head_check.value;
-    merge_probe_reason(status, reason, warnings, head_check.reason, Status::Partial);
+    let head_reason = head_check.reason.clone();
+    let head_failure_reason = head_check.failure_reason;
 
     if !head_matches {
-        return Vec::new();
+        return ChangedFileSupplementProbe {
+            paths: Vec::new(),
+            reason: head_reason,
+            failure_reason: head_failure_reason,
+        };
     }
 
     let base_changed = git::changed_files_against_base(repo_root, base_branch);
-    if base_changed.reason.is_some() {
-        partial_sources.push(String::from("changed_files"));
+    ChangedFileSupplementProbe {
+        paths: base_changed.paths,
+        reason: base_changed.reason.clone(),
+        failure_reason: base_changed
+            .reason
+            .as_ref()
+            .map(|_| SourceFailureReason::LocalGitUnavailable),
     }
-    let base_reason = base_changed.reason.clone();
-    let paths = base_changed.paths;
-    merge_probe_reason(status, reason, warnings, base_reason, Status::Partial);
-    paths
 }
 
 fn local_head_matches_pr_head(repo_root: &Path, pr_head_oid: Option<&str>) -> BoolProbe {
@@ -560,6 +849,7 @@ fn local_head_matches_pr_head(repo_root: &Path, pr_head_oid: Option<&str>) -> Bo
             reason: Some(String::from(
                 "Skipped local changed-file supplementation because PR head OID is unknown",
             )),
+            failure_reason: None,
         };
     };
 
@@ -568,6 +858,7 @@ fn local_head_matches_pr_head(repo_root: &Path, pr_head_oid: Option<&str>) -> Bo
         return BoolProbe {
             value: false,
             reason: Some(reason),
+            failure_reason: Some(SourceFailureReason::LocalGitUnavailable),
         };
     }
 
@@ -575,6 +866,7 @@ fn local_head_matches_pr_head(repo_root: &Path, pr_head_oid: Option<&str>) -> Bo
         BoolProbe {
             value: true,
             reason: None,
+            failure_reason: None,
         }
     } else {
         BoolProbe {
@@ -584,6 +876,7 @@ fn local_head_matches_pr_head(repo_root: &Path, pr_head_oid: Option<&str>) -> Bo
                 short_oid(&local_head.value),
                 short_oid(pr_head_oid)
             )),
+            failure_reason: Some(SourceFailureReason::HeadOidMismatch),
         }
     }
 }
@@ -831,6 +1124,41 @@ fn merge_probe_reason(
 
 fn io_error(error: std::io::Error) -> String {
     error.to_string()
+}
+
+fn skipped_source(name: SourceCoverageName, required: bool) -> SourceCoverageEntry {
+    SourceCoverageEntry::new(name, required, SourceCoverageStatus::Skipped, 0, None, None)
+}
+
+fn coverage_status_for_observed_items(items_seen: usize) -> SourceCoverageStatus {
+    if items_seen > 0 {
+        SourceCoverageStatus::Partial
+    } else {
+        SourceCoverageStatus::Failed
+    }
+}
+
+fn normalize_repository_identity_failure(detail: &str) -> SourceFailureReason {
+    let detail = detail.trim();
+    let lower = detail.to_ascii_lowercase();
+
+    if detail.contains("No git remotes configured") {
+        SourceFailureReason::RepositoryIdentityUnknown
+    } else if lower.contains("not a git repository")
+        || lower.contains("git remote lookup failed")
+        || lower.contains("no such file or directory")
+        || lower.contains("program not found")
+    {
+        SourceFailureReason::LocalGitUnavailable
+    } else {
+        SourceFailureReason::UnsupportedRemote
+    }
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn normalize_repository_identity_failure_for_tests(detail: &str) -> SourceFailureReason {
+    normalize_repository_identity_failure(detail)
 }
 
 fn non_empty_base_branch(value: &str) -> Option<&str> {
