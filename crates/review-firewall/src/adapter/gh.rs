@@ -1,16 +1,32 @@
 use std::path::Path;
 
+use rf_core::domain::SourceFailureReason;
 use serde_json::Value;
 
 use super::run_process;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Failure {
+    pub reason: Option<SourceFailureReason>,
+    pub detail: String,
+}
+
+impl Failure {
+    fn new(reason: Option<SourceFailureReason>, detail: impl Into<String>) -> Self {
+        Self {
+            reason,
+            detail: detail.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ValuesProbe {
     pub values: Vec<Value>,
-    pub reason: Option<String>,
+    pub failure: Option<Failure>,
 }
 
-pub fn pr_view(repo_root: &Path, pr_number: Option<u64>) -> Result<Value, String> {
+pub fn pr_view(repo_root: &Path, pr_number: Option<u64>) -> Result<Value, Failure> {
     let fields = [
         "number",
         "title",
@@ -43,7 +59,7 @@ pub fn review_comments(
     repository_full_name: &str,
     repository_host: &str,
     pr_number: u64,
-) -> Result<ValuesProbe, String> {
+) -> Result<ValuesProbe, Failure> {
     paged_array(
         repo_root,
         repository_full_name,
@@ -60,7 +76,7 @@ pub fn issue_comments(
     repository_full_name: &str,
     repository_host: &str,
     pr_number: u64,
-) -> Result<ValuesProbe, String> {
+) -> Result<ValuesProbe, Failure> {
     paged_array(
         repo_root,
         repository_full_name,
@@ -77,7 +93,7 @@ pub fn changed_files(
     repository_full_name: &str,
     repository_host: &str,
     pr_number: u64,
-) -> Result<ValuesProbe, String> {
+) -> Result<ValuesProbe, Failure> {
     paged_array(
         repo_root,
         repository_full_name,
@@ -97,7 +113,7 @@ fn paged_array(
     resource: &str,
     suffix: &str,
     fallback: &str,
-) -> Result<ValuesProbe, String> {
+) -> Result<ValuesProbe, Failure> {
     collect_paged_arrays(|page| {
         let endpoint = format!(
             "repos/{repository_full_name}/{resource}/{pr_number}/{suffix}?per_page=100&page={page}"
@@ -130,9 +146,9 @@ pub fn gh_hostname_for_tests(repository_host: &str) -> &str {
     gh_hostname(repository_host)
 }
 
-fn collect_paged_arrays<F>(mut fetch_page: F) -> Result<ValuesProbe, String>
+fn collect_paged_arrays<F>(mut fetch_page: F) -> Result<ValuesProbe, Failure>
 where
-    F: FnMut(usize) -> Result<Value, String>,
+    F: FnMut(usize) -> Result<Value, Failure>,
 {
     let mut page = 1usize;
     let mut items = Vec::new();
@@ -144,19 +160,28 @@ where
             Err(error) => {
                 return Ok(ValuesProbe {
                     values: items,
-                    reason: Some(error),
+                    failure: Some(pagination_failure(page - 1, error)),
                 });
             }
         };
         let page_items = match output.as_array().cloned() {
             Some(page_items) => page_items,
             None if items.is_empty() => {
-                return Err(String::from("gh api returned invalid JSON array"));
+                return Err(Failure::new(
+                    Some(SourceFailureReason::JsonParseError),
+                    "gh api returned invalid JSON array",
+                ));
             }
             None => {
                 return Ok(ValuesProbe {
                     values: items,
-                    reason: Some(String::from("gh api returned invalid JSON array")),
+                    failure: Some(Failure::new(
+                        Some(SourceFailureReason::PaginationPartial),
+                        format!(
+                            "GitHub pagination stopped after page {}: gh api returned invalid JSON array",
+                            page - 1
+                        ),
+                    )),
                 });
             }
         };
@@ -165,33 +190,107 @@ where
         if page_len < 100 {
             return Ok(ValuesProbe {
                 values: items,
-                reason: None,
+                failure: None,
             });
         }
         page += 1;
     }
 }
 
+fn pagination_failure(last_completed_page: usize, error: Failure) -> Failure {
+    Failure::new(
+        Some(SourceFailureReason::PaginationPartial),
+        format!(
+            "GitHub pagination stopped after page {last_completed_page}: {}",
+            error.detail
+        ),
+    )
+}
+
 #[cfg(test)]
 #[allow(dead_code)]
 pub fn collect_paged_arrays_for_tests(
-    pages: Vec<Result<Value, String>>,
-) -> Result<ValuesProbe, String> {
+    pages: Vec<Result<Value, Failure>>,
+) -> Result<ValuesProbe, Failure> {
     let mut pages = pages.into_iter();
     collect_paged_arrays(|_| pages.next().unwrap_or_else(|| Ok(Value::Array(Vec::new()))))
 }
 
-fn parse_json_output(repo_root: &Path, args: &[String], fallback: &str) -> Result<Value, String> {
+fn parse_json_output(repo_root: &Path, args: &[String], fallback: &str) -> Result<Value, Failure> {
     let output = run_process(repo_root, "gh", args);
     if !output.success {
-        return Err(output.reason.unwrap_or_else(|| {
+        let detail = output.reason.unwrap_or_else(|| {
             let trimmed = output.stderr.trim();
             if trimmed.is_empty() {
                 fallback.to_owned()
             } else {
                 trimmed.to_owned()
             }
-        }));
+        });
+        return Err(Failure::new(normalize_gh_failure(&detail), detail));
     }
-    serde_json::from_str(&output.stdout).map_err(|error| error.to_string())
+    serde_json::from_str(&output.stdout)
+        .map_err(|error| Failure::new(Some(SourceFailureReason::JsonParseError), error.to_string()))
+}
+
+fn normalize_gh_failure(detail: &str) -> Option<SourceFailureReason> {
+    let lower = detail.to_ascii_lowercase();
+
+    if lower.contains("no such file or directory")
+        || lower.contains("not found in path")
+        || lower.contains("cannot find the file")
+        || lower.contains("program not found")
+    {
+        return Some(SourceFailureReason::GhMissing);
+    }
+
+    if lower.contains("gh auth login")
+        || lower.contains("not logged into")
+        || lower.contains("authentication failed")
+        || lower.contains("no oauth token")
+        || lower.contains("token is required")
+    {
+        return Some(SourceFailureReason::GhNotAuthenticated);
+    }
+
+    if lower.contains("rate limit") {
+        return Some(SourceFailureReason::GhRateLimited);
+    }
+
+    if lower.contains("pull request not found")
+        || lower.contains("no pull requests found")
+        || lower.contains("could not resolve to a pullrequest")
+    {
+        return Some(SourceFailureReason::PrNotFound);
+    }
+
+    if lower.contains("403")
+        || lower.contains("forbidden")
+        || lower.contains("permission denied")
+        || lower.contains("resource not accessible")
+        || lower.contains("insufficient_scopes")
+    {
+        return Some(SourceFailureReason::GhPermissionDenied);
+    }
+
+    if lower.contains("timeout")
+        || lower.contains("temporarily unavailable")
+        || lower.contains("connection reset")
+        || lower.contains("connection refused")
+        || lower.contains("connection aborted")
+        || lower.contains("tls")
+        || lower.contains("network")
+        || lower.contains("dial tcp")
+        || lower.contains("no such host")
+    {
+        return Some(SourceFailureReason::NetworkError);
+    }
+
+    None
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
+pub fn normalize_gh_failure_for_tests(detail: &str) -> Option<SourceFailureReason> {
+    normalize_gh_failure(detail)
 }

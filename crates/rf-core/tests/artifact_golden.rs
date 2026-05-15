@@ -1,7 +1,8 @@
 use rf_core::domain::{
     AdvisoryWeight, BlockerConcern, DataCoverage, DraftReplyArtifact, EvidenceClass, GateArtifact,
     GateConfigSnapshot, GateCounts, PullRequestSummary, ReplyType, ResidualBlocker, ReviewSignal,
-    ScanArtifact, Status,
+    ScanArtifact, SourceCoverageArtifact, SourceCoverageEntry, SourceCoverageName,
+    SourceCoverageStatus, SourceFailureReason, Status, derive_data_coverage_from_sources,
 };
 
 #[test]
@@ -93,6 +94,44 @@ fn gate_artifact_serializes_minimum_shape() {
     assert!(rendered.contains(r#""comments_analyzed": 17"#));
     assert!(rendered.contains(r#""residual_blockers""#));
     assert!(rendered.contains(r#""questions": 4"#));
+}
+
+#[test]
+fn source_coverage_artifact_serializes_minimum_shape() {
+    let sources = vec![
+        SourceCoverageEntry::new(
+            SourceCoverageName::PrMetadata,
+            true,
+            SourceCoverageStatus::Full,
+            1,
+            None,
+            None,
+        ),
+        SourceCoverageEntry::new(
+            SourceCoverageName::ReviewComments,
+            true,
+            SourceCoverageStatus::Partial,
+            100,
+            Some(SourceFailureReason::PaginationPartial),
+            Some(String::from(
+                "GitHub pagination stopped after page 1 while fetching review comments.",
+            )),
+        ),
+    ];
+    let artifact = SourceCoverageArtifact {
+        status: Status::Partial,
+        data_coverage: derive_data_coverage_from_sources(&sources),
+        review_signal: ReviewSignal::Unknown,
+        reason: Some(String::from("review comments were only partially observed")),
+        sources,
+        warnings: Vec::new(),
+    };
+
+    let rendered = serde_json::to_string_pretty(&artifact).expect("source coverage json");
+    assert!(rendered.contains(r#""data_coverage": "PARTIAL""#));
+    assert!(rendered.contains(r#""name": "review_comments""#));
+    assert!(rendered.contains(r#""failure_reason": "pagination_partial""#));
+    assert!(rendered.contains(r#""retry_hint":"#) || rendered.contains(r#""retry_hint": "#));
 }
 
 #[test]
@@ -247,4 +286,31 @@ fn scan_artifact_deserializes_legacy_complete_scan_as_full_coverage() {
     assert_eq!(restored.status, Status::Ok);
     assert_eq!(restored.data_coverage, DataCoverage::Full);
     assert_eq!(restored.review_signal, ReviewSignal::Unknown);
+}
+
+#[test]
+fn source_coverage_derives_failed_when_required_source_fails() {
+    let sources = vec![
+        SourceCoverageEntry::new(
+            SourceCoverageName::PrMetadata,
+            true,
+            SourceCoverageStatus::Failed,
+            0,
+            Some(SourceFailureReason::GhNotAuthenticated),
+            Some(String::from("GitHub CLI is not authenticated.")),
+        ),
+        SourceCoverageEntry::new(
+            SourceCoverageName::Codeowners,
+            false,
+            SourceCoverageStatus::Partial,
+            0,
+            None,
+            Some(String::from("CODEOWNERS could not be read.")),
+        ),
+    ];
+
+    assert_eq!(
+        derive_data_coverage_from_sources(&sources),
+        DataCoverage::Failed
+    );
 }

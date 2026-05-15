@@ -102,7 +102,9 @@ fn print_help() {
     println!("Review the review. Protect the author.");
     println!();
     println!("Usage:");
-    println!("  review-firewall scan [--pr <number>]   Gather PR and repo facts into scan.json");
+    println!(
+        "  review-firewall scan [--pr <number>]   Gather PR and repo facts into scan.json and source_coverage.json"
+    );
     println!(
         "  review-firewall gate                   Classify comments and extract residual blockers"
     );

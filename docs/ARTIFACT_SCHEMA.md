@@ -16,6 +16,7 @@ Rust deserialization may remain backward compatible with selected legacy fields 
     latest.json
     <timestamp>/
       scan.json
+      source_coverage.json
       gate.json
       draft_reply.json
       draft_reply.md
@@ -132,6 +133,9 @@ Recommended additional fields:
 `scan.json.pr.review_decisions` carries the current top-level GitHub review state when available, with the latest effective state derived from review history used only as a fallback when that top-level field is absent.
 It is downstream-visible, but it remains informational input rather than blocker evidence.
 
+`scan.json.partial_sources` remains a lightweight compatibility hint.
+The authoritative per-source ingestion view lives in `source_coverage.json`.
+
 `product_boundary` records the product-category contract for auditability:
 
 ```json
@@ -143,6 +147,69 @@ It is downstream-visible, but it remains informational input rather than blocker
   "uses_llm_for_core_judgment": false
 }
 ```
+
+## `source_coverage.json`
+
+Purpose:
+
+- make missing review inputs explicit
+- normalize scan-time ingestion failures into stable reason classes
+- derive `data_coverage` from required sources without hiding partial local advisory reads
+
+Minimum shape:
+
+```json
+{
+  "status": "OK",
+  "data_coverage": "FULL",
+  "review_signal": "UNKNOWN",
+  "sources": [
+    {
+      "name": "pr_metadata",
+      "required": true,
+      "status": "FULL",
+      "items_seen": 1
+    },
+    {
+      "name": "review_comments",
+      "required": true,
+      "status": "PARTIAL",
+      "items_seen": 100,
+      "failure_reason": "pagination_partial",
+      "detail": "GitHub pagination stopped after page 1 while fetching review comments.",
+      "retry_hint": "Rerun review-firewall scan after checking gh auth, rate limits, or connectivity."
+    }
+  ]
+}
+```
+
+Source status values:
+
+- `FULL`
+- `PARTIAL`
+- `FAILED`
+- `SKIPPED`
+
+Stable failure-reason values used by scan-time ingestion:
+
+- `gh_missing`
+- `gh_not_authenticated`
+- `gh_rate_limited`
+- `gh_permission_denied`
+- `pr_not_found`
+- `repository_identity_unknown`
+- `pagination_partial`
+- `json_parse_error`
+- `network_error`
+- `local_git_unavailable`
+- `head_oid_mismatch`
+- `unsupported_remote`
+
+`data_coverage` is derived only from required sources:
+
+- any required `FAILED` source => `FAILED`
+- else any required `PARTIAL` source => `PARTIAL`
+- else => `FULL`
 
 ## `gate.json`
 

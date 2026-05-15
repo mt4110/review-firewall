@@ -15,7 +15,7 @@ mod io;
 
 use serde_json::Value;
 
-use rf_core::domain::{CommentRecord, CommentSource};
+use rf_core::domain::{CommentRecord, CommentSource, SourceFailureReason};
 
 fn temp_dir(name: &str) -> PathBuf {
     let directory = env::temp_dir().join(format!(
@@ -858,12 +858,44 @@ fn gh_paged_array_preserves_items_when_later_page_fails() {
 
     let probe = adapter::gh::collect_paged_arrays_for_tests(vec![
         Ok(serde_json::Value::Array(first_page)),
-        Err(String::from("rate limited")),
+        Err(adapter::gh::Failure {
+            reason: Some(SourceFailureReason::GhRateLimited),
+            detail: String::from("API rate limit exceeded"),
+        }),
     ])
     .expect("partial page result");
 
     assert_eq!(probe.values.len(), 100);
-    assert_eq!(probe.reason.as_deref(), Some("rate limited"));
+    let failure = probe.failure.expect("partial failure");
+    assert_eq!(failure.reason, Some(SourceFailureReason::PaginationPartial));
+    assert!(failure.detail.contains("page 1"));
+    assert!(failure.detail.contains("API rate limit exceeded"));
+}
+
+#[test]
+fn gh_failure_normalization_maps_expected_reason_classes() {
+    assert_eq!(
+        adapter::gh::normalize_gh_failure_for_tests(
+            "To get started with GitHub CLI, please run: gh auth login"
+        ),
+        Some(SourceFailureReason::GhNotAuthenticated)
+    );
+    assert_eq!(
+        adapter::gh::normalize_gh_failure_for_tests("API rate limit exceeded for 203.0.113.1"),
+        Some(SourceFailureReason::GhRateLimited)
+    );
+    assert_eq!(
+        adapter::gh::normalize_gh_failure_for_tests("resource not accessible by integration"),
+        Some(SourceFailureReason::GhPermissionDenied)
+    );
+    assert_eq!(
+        adapter::gh::normalize_gh_failure_for_tests("pull request not found"),
+        Some(SourceFailureReason::PrNotFound)
+    );
+    assert_eq!(
+        adapter::gh::normalize_gh_failure_for_tests("No such file or directory (os error 2)"),
+        Some(SourceFailureReason::GhMissing)
+    );
 }
 
 #[test]

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SourceCoverageArtifact",
+  "type": "object",
+  "required": [
+    "status",
+    "data_coverage",
+    "review_signal",
+    "sources"
+  ],
+  "$defs": {
+    "source_entry": {
+      "type": "object",
+      "required": [
+        "name",
+        "required",
+        "status",
+        "items_seen"
+      ],
+      "properties": {
+        "name": {
+          "enum": [
+            "repo_root",
+            "current_branch",
+            "config",
+            "codeowners",
+            "pr_metadata",
+            "changed_files",
+            "review_comments",
+            "review_body_comments",
+            "issue_comments",
+            "review_decision"
+          ]
+        },
+        "required": { "type": "boolean" },
+        "status": { "enum": ["FULL", "PARTIAL", "FAILED", "SKIPPED"] },
+        "items_seen": { "type": "integer", "minimum": 0 },
+        "failure_reason": {
+          "enum": [
+            "gh_missing",
+            "gh_not_authenticated",
+            "gh_rate_limited",
+            "gh_permission_denied",
+            "pr_not_found",
+            "repository_identity_unknown",
+            "pagination_partial",
+            "json_parse_error",
+            "network_error",
+            "local_git_unavailable",
+            "head_oid_mismatch",
+            "unsupported_remote"
+          ]
+        },
+        "detail": { "type": "string" },
+        "retry_hint": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "properties": {
+    "status": { "enum": ["OK", "PARTIAL", "ERROR"] },
+    "data_coverage": { "enum": ["FULL", "PARTIAL", "FAILED"] },
+    "review_signal": { "enum": ["BLOCKED", "CLEAR", "UNKNOWN"] },
+    "reason": { "type": "string" },
+    "sources": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/source_entry" }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": true
+}
